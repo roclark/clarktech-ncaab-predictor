@@ -1,10 +1,10 @@
 import re
 import requests
-
 from bs4 import BeautifulSoup
+from constants import YEAR
 
 
-TEAMS_URL = 'http://www.sports-reference.com/cbb/seasons/2017-school-stats.html'
+TEAMS_URL = 'http://www.sports-reference.com/cbb/seasons/%s-school-stats.html' % YEAR
 
 
 def request_teams_list():
@@ -14,11 +14,9 @@ def request_teams_list():
 
 
 def parse_team(team_tag):
-    team_name = re.findall('>.*<', team_tag)[0]
-    team_name = re.sub('>', '', team_name)
-    team_name = re.sub('<', '', team_name)
+    team_name = team_tag.get_text()
     team_name = re.sub('&amp;', '&', team_name)
-    team_link = re.findall('schools/.*/2017.html', team_tag)[0]
+    team_link = re.findall('schools/.*/%s.html' % YEAR, str(team_tag))[0]
     team_link = re.sub('schools/', '', team_link)
     team_link = re.sub('/.*', '', team_link)
     return team_name, team_link
@@ -32,7 +30,7 @@ def parse_teams_list(teams_list):
         for team in teams_list.find_all('tr'):
             if team.a is None:
                 continue
-            team_name, team_link = parse_team(str(team.a))
+            team_name, team_link = parse_team(team.a)
             teams_file.write('    "%s": "%s",\n' % (team_name, team_link))
             num_teams += 1
             print 'Team found: %s' % team_name
