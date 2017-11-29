@@ -24,6 +24,11 @@ def parse_team_stats(team_html):
     team_stats = {}
 
     for item in team_html.find_all('tr'):
+        # Sometimes, a player has 'Team' in their high school name. In such
+        # cases, skip over them as we only want the Team and Opponents Stats
+        # section.
+        if 'high_school' in str(item):
+            continue
         if 'Opponent' in str(item) or 'Team' in str(item):
             for tag in item.find_all('td'):
                 field = str(dict(tag.attrs).get('data-stat'))

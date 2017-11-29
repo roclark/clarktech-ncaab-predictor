@@ -84,6 +84,13 @@ def get_match_data(matches):
                                                             {'class': 'score'}
                                                            ))
         team_totals = match_soup.find_all('tfoot')
+        # Sometimes, sports-reference makes a mistake and doesn't sum the totals
+        # in the bottom of the stats tables. Instead of calculating them, and
+        # dramatically increasing the complexity of the parser, just skip the
+        # game as the sample size is large enough for a game or two to be
+        # largely insignificant.
+        if len(team_totals) < 2:
+            continue
         stats = create_stats_dict({}, team_totals[0])
         stats = create_stats_dict(stats, team_totals[1], away=True)
         home_rank, away_rank = check_if_team_ranked(
