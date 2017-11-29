@@ -1,7 +1,9 @@
 import csv
 import os
+import re
 import requests
 from bs4 import BeautifulSoup
+from common import include_team_rank
 from constants import YEAR
 from teams import TEAMS
 
@@ -37,6 +39,23 @@ def check_if_home_team_won(scores):
         return 1
 
 
+def get_rank(team):
+    ranking = team.find_all('span', class_='pollrank')
+    if ranking:
+        ranking = ranking[0].get_text()
+        ranking = re.sub('.*\(', '', ranking)
+        ranking = re.sub('\).*', '', ranking)
+        return ranking
+    return '-'
+
+
+def check_if_team_ranked(teams):
+    away_team, home_team = teams.find_all('tr')
+    away_rank = get_rank(away_team)
+    home_rank = get_rank(home_team)
+    return away_rank, home_rank
+
+
 def save_match_stats(match_name, stats):
     match_filename = 'matches/%s' % match_name
     header = stats.keys()
@@ -67,7 +86,12 @@ def get_match_data(matches):
         team_totals = match_soup.find_all('tfoot')
         stats = create_stats_dict({}, team_totals[0])
         stats = create_stats_dict(stats, team_totals[1], away=True)
+        home_rank, away_rank = check_if_team_ranked(
+            match_soup.find_all('div', class_='game_summary nohover current')[0]
+        )
         stats['home_win'] = winner
+        stats = include_team_rank(stats, home_rank)
+        stats = include_team_rank(stats, away_rank, away=True)
         save_match_stats(match_name, stats)
 
 

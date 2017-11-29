@@ -2,6 +2,7 @@ import csv
 import re
 import requests
 from bs4 import BeautifulSoup
+from common import include_team_rank
 from constants import YEAR
 from teams import TEAMS
 
@@ -31,31 +32,6 @@ def parse_team_stats(team_html):
                 elif 'Opponent' in str(item) and field == 'mp':
                     field = 'opp_mp'
                 team_stats[field] = float(tag.get_text())
-    return team_stats
-
-
-def include_team_rank(team_stats, ranking):
-    team_stats['rank_1-5'] = 0
-    team_stats['rank_6-10'] = 0
-    team_stats['rank_11-15'] = 0
-    team_stats['rank_16-20'] = 0
-    team_stats['rank_21-25'] = 0
-
-    try:
-        int(ranking)
-    except ValueError:
-        return team_stats
-
-    if ranking < 6:
-        team_stats['rank_1-5'] = 1
-    elif ranking < 11:
-        team_stats['rank_6-10'] = 1
-    elif ranking < 16:
-        team_stats['rank_11-15'] = 1
-    elif ranking < 21:
-        team_stats['rank_16-20'] = 1
-    elif ranking < 26:
-        team_stats['rank_21-25'] = 1
     return team_stats
 
 
