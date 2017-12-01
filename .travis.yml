@@ -16,4 +16,4 @@ install:
 script:
     - python pull-stats.py
     - python crawl-matches.py
-    - python predictor.py
+    - python test.py
