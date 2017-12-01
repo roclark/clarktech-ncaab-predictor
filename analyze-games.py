@@ -1,7 +1,6 @@
 import numpy
 import re
 import requests
-
 from bs4 import BeautifulSoup
 from common import create_stats_array, read_team_stats_file
 from datetime import datetime

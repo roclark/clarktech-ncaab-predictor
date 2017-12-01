@@ -1,6 +1,7 @@
 import csv
 import re
 import requests
+import os
 from bs4 import BeautifulSoup
 from common import include_team_rank
 from constants import YEAR
@@ -69,4 +70,6 @@ def main():
 
 
 if __name__ == "__main__":
+    if not os.path.exists('team-stats'):
+        os.makedirs('team-stats')
     main()
