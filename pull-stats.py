@@ -59,7 +59,10 @@ def traverse_teams_list():
         team_page = requests.get(TEAM_PAGE % (team, YEAR))
         team_html = BeautifulSoup(team_page.text, 'html5lib')
         team_stats = parse_team_stats(team_html)
-        schedule = requests.get(SCHEDULE_PAGE % (team, YEAR))
+        try:
+            schedule = requests.get(SCHEDULE_PAGE % (team, YEAR))
+        except requests.exceptions.ConnectionError:
+            continue
         schedule_html = BeautifulSoup(schedule.text, 'html5lib')
         team_stats = parse_team_rank(schedule_html, team_stats)
         write_team_stats_file(team, name, team_stats)

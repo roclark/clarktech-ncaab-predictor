@@ -78,7 +78,13 @@ def get_match_data(matches):
         match_name = match_name.replace('.html', '')
         if match_already_saved(match_name):
             continue
-        match_request = requests.get(match)
+        try:
+            match_request = requests.get(match)
+        except requests.exceptions.ConnectionError:
+            try:
+                match_request = requests.get(match)
+            except requests.exceptions.ConnectionError:
+                continue
         match_soup = BeautifulSoup(match_request.text, 'html5lib')
         winner = check_if_home_team_won(match_soup.find_all('div',
                                                             {'class': 'score'}
