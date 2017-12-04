@@ -8,6 +8,7 @@ def include_team_rank(team_stats, ranking, away=False):
     tier3 = 'rank11-15'
     tier4 = 'rank16-20'
     tier5 = 'rank21-25'
+    overall = 'ranked'
 
     if away:
         tier1 = 'opp_rank1-5'
@@ -15,15 +16,17 @@ def include_team_rank(team_stats, ranking, away=False):
         tier3 = 'opp_rank11-15'
         tier4 = 'opp_rank16-20'
         tier5 = 'opp_rank21-25'
+        overall = 'opp_ranked'
 
     team_stats[tier1] = 0
     team_stats[tier2] = 0
     team_stats[tier3] = 0
     team_stats[tier4] = 0
     team_stats[tier5] = 0
+    team_stats[overall] = 0
 
     try:
-        int(ranking)
+        ranking = int(ranking)
     except ValueError:
         return team_stats
 
@@ -37,6 +40,7 @@ def include_team_rank(team_stats, ranking, away=False):
         team_stats[tier4] = 1
     elif ranking < 26:
         team_stats[tier5] = 1
+    team_stats[overall] = 1
     return team_stats
 
 
