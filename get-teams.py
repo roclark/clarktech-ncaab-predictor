@@ -1,6 +1,7 @@
 import re
-import requests
+import sys
 from bs4 import BeautifulSoup
+from common import make_request
 from constants import YEAR
 
 
@@ -8,7 +9,9 @@ TEAMS_URL = 'http://www.sports-reference.com/cbb/seasons/%s-school-stats.html' %
 
 
 def request_teams_list():
-    teams_request = requests.get(TEAMS_URL)
+    teams_request = make_request(TEAMS_URL)
+    if not teams_request:
+        return None
     teams_html_page = BeautifulSoup(teams_request.text, 'html5lib')
     return teams_html_page.find('tbody')
 
@@ -40,6 +43,9 @@ def parse_teams_list(teams_list):
 
 def main():
     teams_list = request_teams_list()
+    if not teams_list:
+        print 'Error: Could not capture teams'
+        sys.exit(1)
     parse_teams_list(teams_list)
 
 

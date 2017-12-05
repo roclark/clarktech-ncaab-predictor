@@ -1,9 +1,8 @@
 import csv
 import re
-import requests
 import os
 from bs4 import BeautifulSoup
-from common import include_team_rank
+from common import include_team_rank, make_request
 from constants import YEAR
 from teams import TEAMS
 
@@ -56,12 +55,13 @@ def traverse_teams_list():
         print '[%s/%s] Extracting stats for: %s' % (str(teams_parsed).rjust(3),
                                                     len(TEAMS),
                                                     name)
-        team_page = requests.get(TEAM_PAGE % (team, YEAR))
+        team_page = make_request(TEAM_PAGE % (team, YEAR))
+        if not team_page:
+            continue
         team_html = BeautifulSoup(team_page.text, 'html5lib')
         team_stats = parse_team_stats(team_html)
-        try:
-            schedule = requests.get(SCHEDULE_PAGE % (team, YEAR))
-        except requests.exceptions.ConnectionError:
+        schedule = make_request(SCHEDULE_PAGE % (team, YEAR))
+        if not schedule:
             continue
         schedule_html = BeautifulSoup(schedule.text, 'html5lib')
         team_stats = parse_team_rank(schedule_html, team_stats)

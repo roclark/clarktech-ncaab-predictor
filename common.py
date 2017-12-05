@@ -1,4 +1,5 @@
 import numpy
+import requests
 
 
 def include_team_rank(team_stats, ranking, away=False):
@@ -37,3 +38,14 @@ def include_team_rank(team_stats, ranking, away=False):
     elif ranking < 26:
         team_stats[tier5] = 1
     return team_stats
+
+
+def make_request(url):
+    # Try a URL 3 times. If it still doesn't work, just skip the entry.
+    for i in xrange(3):
+        try:
+            response = requests.get(url)
+            return response
+        except requests.exceptions.ConnectionError:
+            continue
+    return None

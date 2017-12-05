@@ -1,9 +1,8 @@
 import csv
 import os
 import re
-import requests
 from bs4 import BeautifulSoup
-from common import include_team_rank
+from common import include_team_rank, make_request
 from constants import YEAR
 from teams import TEAMS
 
@@ -78,13 +77,9 @@ def get_match_data(matches):
         match_name = match_name.replace('.html', '')
         if match_already_saved(match_name):
             continue
-        try:
-            match_request = requests.get(match)
-        except requests.exceptions.ConnectionError:
-            try:
-                match_request = requests.get(match)
-            except requests.exceptions.ConnectionError:
-                continue
+        match_request = make_request(match)
+        if not match_request:
+            continue
         match_soup = BeautifulSoup(match_request.text, 'html5lib')
         winner = check_if_home_team_won(match_soup.find_all('div',
                                                             {'class': 'score'}
@@ -117,7 +112,9 @@ def crawl_team_matches():
         print '[%s/%s] Extracting matches for %s' % (str(count).rjust(3),
                                                      len(TEAMS),
                                                      name)
-        team_schedule = requests.get(SCHEDULE % (team, YEAR))
+        team_schedule = make_request(SCHEDULE % (team, YEAR))
+        if not team_schedule:
+            continue
         team_soup = BeautifulSoup(team_schedule.text, 'html5lib')
         games = team_soup.find_all('table', {'class': 'sortable stats_table'})
 
