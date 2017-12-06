@@ -1,6 +1,9 @@
 import pandas as pd
 import numpy as np
 from glob import glob
+from sklearn import tree
+from sklearn.externals.six import StringIO
+from sklearn.metrics import accuracy_score
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.feature_selection import SelectFromModel
 from sklearn.cross_validation import cross_val_score
@@ -28,6 +31,35 @@ class Predictor:
                                scoring='accuracy')
         print 'Accuracy: %s%%' % round(np.mean(xval) * 100.0, 2)
 
+    def print_tree(self):
+        dot_data = StringIO()
+        i = 1
+        for tree_in_forest in self._model.estimators_:
+            dot_data = tree.export_graphviz(tree_in_forest,
+                                            out_file='tree_%s.dot' % str(i),
+                                            feature_names=self._filtered_features,
+                                            class_names=['away_win', 'home_win'],
+                                            filled=True,
+                                            rounded=True,
+                                            special_characters=True)
+            i += 1
+
+    def simplify(self, test_data):
+        self._test = test_data.loc[:, test_data.columns.isin(self._filtered_features)]
+        self._test = self._test.reindex_axis(self._filtered_features, axis=1)
+        parameters = {'bootstrap': False,
+                      'min_samples_leaf': 3,
+                      'n_estimators': 50,
+                      'min_samples_split': 10,
+                      'max_features': 'sqrt',
+                      'max_depth': 6}
+        self._model = RandomForestClassifier(**parameters)
+        self._model.fit(self._train, self._targets)
+        return self._test
+
+    def predict(self, test_data, output_datatype):
+        return self._model.predict(test_data).astype(output_datatype)
+
     def _read_data(self):
         data = pd.DataFrame()
 
@@ -36,27 +68,18 @@ class Predictor:
         return data
 
     def _create_features(self, data):
-        train_length = int(len(data) * 0.75)
-        self._targets = data.home_win.head(train_length)
+        self._targets = data.home_win
         train = data.drop('home_win', 1)
         train.drop('pts', 1, inplace=True)
-        train.drop('opp_pts', 1, inplace=True)
-        self._test = train.iloc[train_length:]
-        self._train = train.head(train_length)
+        self._train = train.drop('opp_pts', 1)
 
     def _create_classifier(self):
         clf = RandomForestClassifier(n_estimators=50, max_features='sqrt')
         self._classifier = clf.fit(self._train, self._targets)
 
     def _train_model(self):
-        model = SelectFromModel(self._classifier, prefit=True)
-        train_reduced = model.transform(self._train)
-
-        parameters = {'bootstrap': False,
-                      'min_samples_leaf': 3,
-                      'n_estimators': 50,
-                      'min_samples_split': 10,
-                      'max_features': 'sqrt',
-                      'max_depth': 6}
-        self._model = RandomForestClassifier(**parameters)
-        self._model.fit(train_reduced, self._targets)
+        train = self._train
+        self._model = SelectFromModel(self._classifier, prefit=True)
+        self._train = self._model.transform(self._train)
+        new_columns = train.columns[self._model.get_support()]
+        self._filtered_features = [str(col) for col in new_columns]
