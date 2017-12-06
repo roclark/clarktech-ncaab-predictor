@@ -65,10 +65,12 @@ def convert_team_totals_to_averages(stats):
                          'fta', 'orb', 'drb', 'trb', 'ast', 'stl', 'blk', 'tov',
                          'pf', 'pts']
     num_games = stats['g']
+    new_stats = stats.copy()
 
     for field in fields_to_average:
-        stats[field] = float(stats[field]) / num_games
-    return stats
+        new_value = float(stats[field]) / num_games
+        new_stats.loc[:,field] = new_value
+    return new_stats
 
 
 def extract_stats_components(stats, away=False):
