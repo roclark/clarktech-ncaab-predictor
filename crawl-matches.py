@@ -2,7 +2,7 @@ import csv
 import os
 import re
 from bs4 import BeautifulSoup
-from common import include_team_rank, make_request
+from common import include_team_rank, include_wins_and_losses, make_request
 from constants import YEAR
 from requests import Session
 from teams import TEAMS
@@ -72,6 +72,25 @@ def match_already_saved(match_name):
     return False
 
 
+def parse_records(record_string):
+    record = re.findall('\d+-\d+', record_string)[0]
+    return str(record).split('-')
+
+
+def get_wins_and_losses(html):
+    regex_capture = '<div class="score">\d+</div><div>\d+-\d+</div>'
+    records = re.findall(regex_capture, str(html))
+    # Non-DI schools do not have their records saved. Skip these games as we
+    # don't want them to throw off the classifier.
+    if len(records) < 2:
+        return None
+    record_list = []
+    for record in records:
+        record_list.append(parse_records(record))
+    #[[Home Wins, Home Losses], [Away Wins, Away Losses]]
+    return record_list
+
+
 def get_match_data(session, matches):
     for match in matches:
         match_name = match.replace(BOXSCORES, '')
@@ -82,6 +101,10 @@ def get_match_data(session, matches):
         if not match_request:
             continue
         match_soup = BeautifulSoup(match_request.text, 'lxml')
+        records = get_wins_and_losses(match_soup)
+        # Skip any teams that don't have a record as they are non-DI.
+        if not records:
+            continue
         winner = check_if_home_team_won(match_soup.find_all('div',
                                                             {'class': 'score'}
                                                            ))
@@ -101,16 +124,18 @@ def get_match_data(session, matches):
         stats['home_win'] = winner
         stats = include_team_rank(stats, home_rank)
         stats = include_team_rank(stats, away_rank, away=True)
+        stats = include_wins_and_losses(stats, *records[0], away=True)
+        stats = include_wins_and_losses(stats, *records[1])
         save_match_stats(match_name, stats)
 
 
 def crawl_team_matches():
     count = 0
-    matches = set()
     session = Session()
     session.trust_env = False
 
     for name, team in TEAMS.items():
+        matches = set()
         count += 1
         print '[%s/%s] Extracting matches for %s' % (str(count).rjust(3),
                                                      len(TEAMS),

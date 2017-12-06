@@ -2,7 +2,7 @@ import csv
 import re
 import os
 from bs4 import BeautifulSoup
-from common import include_team_rank, make_request
+from common import include_team_rank, include_wins_and_losses, make_request
 from constants import YEAR
 from requests import Session
 from teams import TEAMS
@@ -21,8 +21,17 @@ def write_team_stats_file(team_link, name, stats):
         dict_writer.writerows([stats])
 
 
+def get_wins_and_losses(paragraphs):
+    for line in paragraphs:
+        if 'Overall:' in str(line):
+            record = re.findall('\d+-\d+', line.get_text())[0]
+            return str(record).split('-')
+
+
 def parse_team_stats(team_html):
     team_stats = {}
+
+    wins, losses = get_wins_and_losses(team_html.find_all('p'))
 
     for item in team_html.find_all('tr'):
         # Sometimes, a player has 'Team' in their high school name. In such
@@ -38,6 +47,7 @@ def parse_team_stats(team_html):
                 elif 'Opponent' in str(item) and field == 'mp':
                     field = 'opp_mp'
                 team_stats[field] = float(tag.get_text())
+    include_wins_and_losses(team_stats, wins, losses)
     return team_stats
 
 

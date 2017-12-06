@@ -53,3 +53,19 @@ def make_request(session, url):
         except requests.exceptions.ConnectionError:
             continue
     return None
+
+
+def include_wins_and_losses(stats, wins, losses, away=False):
+    wins = float(wins)
+    losses = float(losses)
+    win_percentage = float(wins / (wins + losses))
+
+    if away:
+        stats['opp_wins'] = wins
+        stats['opp_losses'] = losses
+        stats['opp_win_pct'] = win_percentage
+    else:
+        stats['wins'] = wins
+        stats['losses'] = losses
+        stats['win_pct'] = win_percentage
+    return stats
