@@ -42,7 +42,7 @@ class Predictor:
 
     def simplify(self, test_data):
         self._test = test_data.loc[:, test_data.columns.isin(self._filtered_features)]
-        self._test = self._test.reindex_axis(self._filtered_features, axis=1)
+        self._test = self._test.reindex(self._filtered_features, axis=1)
         parameters = {'bootstrap': False,
                       'min_samples_leaf': 3,
                       'n_estimators': 50,
