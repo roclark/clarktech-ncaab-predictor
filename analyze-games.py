@@ -127,8 +127,8 @@ def find_todays_games(predictor):
 
 def main():
     predictor = Predictor()
-    predictor.accuracy
     find_todays_games(predictor)
+    predictor.accuracy
 
 
 if __name__ == "__main__":

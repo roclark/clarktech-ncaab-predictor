@@ -6,7 +6,6 @@ from sklearn.externals.six import StringIO
 from sklearn.metrics import accuracy_score
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.feature_selection import SelectFromModel
-from sklearn.cross_validation import cross_val_score
 
 
 class Predictor:
@@ -24,12 +23,9 @@ class Predictor:
 
     @property
     def accuracy(self):
-        xval = cross_val_score(self._classifier,
-                               self._train,
-                               self._targets,
-                               cv = 5,
-                               scoring='accuracy')
-        print 'Accuracy: %s%%' % round(np.mean(xval) * 100.0, 2)
+        predicted = self.predict(self._train, int)
+        accuracy = round(accuracy_score(self._targets, predicted) * 100.0, 2)
+        print 'Accuracy: %s%%' % accuracy
 
     def print_tree(self):
         dot_data = StringIO()
