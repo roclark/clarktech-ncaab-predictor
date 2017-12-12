@@ -4,6 +4,7 @@ import re
 from bs4 import BeautifulSoup
 from common import include_team_rank, make_request
 from constants import YEAR
+from requests import Session
 from teams import TEAMS
 
 
@@ -71,13 +72,13 @@ def match_already_saved(match_name):
     return False
 
 
-def get_match_data(matches):
+def get_match_data(session, matches):
     for match in matches:
         match_name = match.replace(BOXSCORES, '')
         match_name = match_name.replace('.html', '')
         if match_already_saved(match_name):
             continue
-        match_request = make_request(match)
+        match_request = make_request(session, match)
         if not match_request:
             continue
         match_soup = BeautifulSoup(match_request.text, 'lxml')
@@ -106,13 +107,15 @@ def get_match_data(matches):
 def crawl_team_matches():
     count = 0
     matches = set()
+    session = Session()
+    session.trust_env = False
 
     for name, team in TEAMS.items():
         count += 1
         print '[%s/%s] Extracting matches for %s' % (str(count).rjust(3),
                                                      len(TEAMS),
                                                      name)
-        team_schedule = make_request(SCHEDULE % (team, YEAR))
+        team_schedule = make_request(session, SCHEDULE % (team, YEAR))
         if not team_schedule:
             continue
         team_soup = BeautifulSoup(team_schedule.text, 'lxml')
@@ -122,7 +125,7 @@ def crawl_team_matches():
             if game.find('a') and 'boxscores' in str(game.a):
                 url = 'http://www.sports-reference.com%s' % str(game.a['href'])
                 matches.add(url)
-        get_match_data(matches)
+        get_match_data(session, matches)
 
 
 if __name__ == "__main__":

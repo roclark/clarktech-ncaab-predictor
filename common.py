@@ -44,11 +44,11 @@ def include_team_rank(team_stats, ranking, away=False):
     return team_stats
 
 
-def make_request(url):
+def make_request(session, url):
     # Try a URL 3 times. If it still doesn't work, just skip the entry.
     for i in xrange(3):
         try:
-            response = requests.get(url)
+            response = session.get(url)
             return response
         except requests.exceptions.ConnectionError:
             continue

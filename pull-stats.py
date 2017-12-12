@@ -4,6 +4,7 @@ import os
 from bs4 import BeautifulSoup
 from common import include_team_rank, make_request
 from constants import YEAR
+from requests import Session
 from teams import TEAMS
 
 
@@ -49,18 +50,20 @@ def parse_team_rank(schedule_html, team_stats):
 
 def traverse_teams_list():
     teams_parsed = 0
+    session = Session()
+    session.trust_env = False
 
     for name, team in TEAMS.items():
         teams_parsed += 1
         print '[%s/%s] Extracting stats for: %s' % (str(teams_parsed).rjust(3),
                                                     len(TEAMS),
                                                     name)
-        team_page = make_request(TEAM_PAGE % (team, YEAR))
+        team_page = make_request(session, TEAM_PAGE % (team, YEAR))
         if not team_page:
             continue
         team_html = BeautifulSoup(team_page.text, 'lxml')
         team_stats = parse_team_stats(team_html)
-        schedule = make_request(SCHEDULE_PAGE % (team, YEAR))
+        schedule = make_request(session, SCHEDULE_PAGE % (team, YEAR))
         if not schedule:
             continue
         schedule_html = BeautifulSoup(schedule.text, 'lxml')

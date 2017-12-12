@@ -3,13 +3,16 @@ import sys
 from bs4 import BeautifulSoup
 from common import make_request
 from constants import YEAR
+from requests import Session
 
 
 TEAMS_URL = 'http://www.sports-reference.com/cbb/seasons/%s-school-stats.html' % YEAR
 
 
 def request_teams_list():
-    teams_request = make_request(TEAMS_URL)
+    session = Session()
+    session.trust_env = False
+    teams_request = make_request(session, TEAMS_URL)
     if not teams_request:
         return None
     teams_html_page = BeautifulSoup(teams_request.text, 'lxml')
