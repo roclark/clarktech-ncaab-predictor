@@ -58,12 +58,12 @@ def traverse_teams_list():
         team_page = make_request(TEAM_PAGE % (team, YEAR))
         if not team_page:
             continue
-        team_html = BeautifulSoup(team_page.text, 'html5lib')
+        team_html = BeautifulSoup(team_page.text, 'lxml')
         team_stats = parse_team_stats(team_html)
         schedule = make_request(SCHEDULE_PAGE % (team, YEAR))
         if not schedule:
             continue
-        schedule_html = BeautifulSoup(schedule.text, 'html5lib')
+        schedule_html = BeautifulSoup(schedule.text, 'lxml')
         team_stats = parse_team_rank(schedule_html, team_stats)
         write_team_stats_file(team, name, team_stats)
 

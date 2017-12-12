@@ -12,7 +12,7 @@ def request_teams_list():
     teams_request = make_request(TEAMS_URL)
     if not teams_request:
         return None
-    teams_html_page = BeautifulSoup(teams_request.text, 'html5lib')
+    teams_html_page = BeautifulSoup(teams_request.text, 'lxml')
     return teams_html_page.find('tbody')
 
 

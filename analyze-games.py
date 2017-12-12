@@ -123,7 +123,7 @@ def parse_boxscores(boxscore_html, predictor):
 def find_todays_games(predictor):
     url = retrieve_todays_url()
     boxscores = requests.get(url)
-    boxscore_html = BeautifulSoup(boxscores.text, 'html5lib')
+    boxscore_html = BeautifulSoup(boxscores.text, 'lxml')
     parse_boxscores(boxscore_html, predictor)
 
 

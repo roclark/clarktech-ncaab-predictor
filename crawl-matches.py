@@ -80,7 +80,7 @@ def get_match_data(matches):
         match_request = make_request(match)
         if not match_request:
             continue
-        match_soup = BeautifulSoup(match_request.text, 'html5lib')
+        match_soup = BeautifulSoup(match_request.text, 'lxml')
         winner = check_if_home_team_won(match_soup.find_all('div',
                                                             {'class': 'score'}
                                                            ))
@@ -115,7 +115,7 @@ def crawl_team_matches():
         team_schedule = make_request(SCHEDULE % (team, YEAR))
         if not team_schedule:
             continue
-        team_soup = BeautifulSoup(team_schedule.text, 'html5lib')
+        team_soup = BeautifulSoup(team_schedule.text, 'lxml')
         games = team_soup.find_all('table', {'class': 'sortable stats_table'})
 
         for game in games[-1].tbody.find_all('tr'):
