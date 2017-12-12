@@ -1,3 +1,4 @@
+import argparse
 import numpy
 import pandas as pd
 import re
@@ -127,8 +128,18 @@ def find_todays_games(predictor):
     parse_boxscores(boxscore_html, predictor)
 
 
+def arguments():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--dataset', help='Specify which dataset to use. For '
+    'testing purposes, use the "sample-data" directory. For production '
+    'deployments, use "matches" with current data that was pulled.',
+    default='matches')
+    return parser.parse_args()
+
+
 def main():
-    predictor = Predictor()
+    args = arguments()
+    predictor = Predictor(args.dataset)
     find_todays_games(predictor)
     predictor.accuracy
 

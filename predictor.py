@@ -9,14 +9,14 @@ from sklearn.feature_selection import SelectFromModel
 
 
 class Predictor:
-    def __init__(self):
+    def __init__(self, data_directory='matches'):
         self._classifier = None
         self._model = None
         self._targets = None
         self._test = None
         self._train = None
 
-        data = self._read_data()
+        data = self._read_data(data_directory)
         self._create_features(data)
         self._create_classifier()
         self._train_model()
@@ -56,10 +56,10 @@ class Predictor:
     def predict(self, test_data, output_datatype):
         return self._model.predict(test_data).astype(output_datatype)
 
-    def _read_data(self):
+    def _read_data(self, data_directory):
         data = pd.DataFrame()
 
-        for match in glob('matches/*'):
+        for match in glob('%s/*' % data_directory):
             data = data.append(pd.read_csv(match))
         return data
 

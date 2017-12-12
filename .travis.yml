@@ -16,4 +16,4 @@ install:
 script:
     - python get-teams.py
     - python pull-stats.py
-    - python analyze-games.py
+    - python analyze-games.py --dataset sample-data
