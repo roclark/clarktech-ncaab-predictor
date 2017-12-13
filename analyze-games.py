@@ -88,10 +88,12 @@ def extract_stats_components(stats, away=False):
 
 
 def filter_stats(match_stats):
-    fields_to_drop = ['pts', 'opp_pts', 'g', 'opp_g', 'opp_pts_per_g',
-                      'pts_per_g']
+    fields_to_drop = ['pts', 'opp_pts', 'g', 'opp_g']
+    fields_to_rename = {'win_loss_pct': 'win_pct',
+                        'opp_win_loss_pct': 'opp_win_pct'}
     for field in fields_to_drop:
         match_stats.drop(field, 1, inplace=True)
+    match_stats.rename(columns=fields_to_rename, inplace=True)
     return match_stats
 
 
