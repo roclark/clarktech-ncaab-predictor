@@ -5,6 +5,7 @@ from bs4 import BeautifulSoup
 from common import include_team_rank, include_wins_and_losses, make_request
 from constants import YEAR
 from requests import Session
+from sos import SOS
 from teams import TEAMS
 
 
@@ -54,6 +55,31 @@ def check_if_team_ranked(teams):
     away_rank = get_rank(away_team)
     home_rank = get_rank(home_team)
     return away_rank, home_rank
+
+
+def include_sos(stats, name, away=False):
+    print name, SOS[name]
+    if away:
+        stats['opp_sos'] = SOS[name]
+    else:
+        stats['sos'] = SOS[name]
+    return stats
+
+
+def get_names(names):
+    home_name = None
+    away_name = None
+
+    for name in names.find_all('a'):
+        if 'boxscores' in str(name):
+            continue
+        name = str(name).replace('<a href="/cbb/schools/', '')
+        name = re.sub('/.*', '', name)
+        if not away_name:
+            away_name = name
+        else:
+            home_name = name
+    return home_name, away_name
 
 
 def save_match_stats(match_name, stats):
@@ -121,11 +147,16 @@ def get_match_data(session, matches):
         home_rank, away_rank = check_if_team_ranked(
             match_soup.find_all('div', class_='game_summary nohover current')[0]
         )
+        home_name, away_name = get_names(
+            match_soup.find_all('div', class_='game_summary nohover current')[0]
+        )
         stats['home_win'] = winner
         stats = include_team_rank(stats, home_rank)
         stats = include_team_rank(stats, away_rank, away=True)
         stats = include_wins_and_losses(stats, *records[0], away=True)
         stats = include_wins_and_losses(stats, *records[1])
+        stats = include_sos(stats, home_name)
+        stats = include_sos(stats, away_name, away=True)
         save_match_stats(match_name, stats)
 
 
