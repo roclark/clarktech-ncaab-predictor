@@ -2,7 +2,7 @@ import csv
 import re
 import os
 from bs4 import BeautifulSoup
-from common import include_team_rank, make_request
+from common import include_team_rank, make_request, weighted_sos
 from constants import YEAR
 from requests import Session
 
@@ -34,6 +34,11 @@ def parse_stats_page(stats_page, rankings):
     teams_list = []
 
     stats_html = BeautifulSoup(stats_page.text, 'lxml')
+    sos_tags = stats_html.find_all('td', attrs={'data-stat': 'sos'})
+    sos_tags = [float(tag.get_text()) for tag in sos_tags]
+    min_sos = min(sos_tags)
+    max_sos = max(sos_tags)
+
     # The first row just describes the stats. Skip it as it is irrelevant.
     team_stats = stats_html.find_all('tr', class_='')[1:]
     for team in team_stats:
@@ -60,11 +65,13 @@ def parse_stats_page(stats_page, rankings):
             rank = '-'
         stats = add_categories(stats)
         stats = include_team_rank(stats, rank)
+        stats = weighted_sos(stats, float(sos), stats['win_loss_pct'], max_sos,
+                             min_sos)
         write_team_stats_file(nickname, stats)
         teams_list.append([name, nickname])
         sos_list.append([str(nickname), str(sos)])
     write_teams_list(teams_list)
-    return sos_list
+    return sos_list, max_sos, min_sos
 
 
 def get_stats_page(session):
@@ -72,13 +79,15 @@ def get_stats_page(session):
     return stats_page
 
 
-def save_sos_list(sos_list):
+def save_sos_list(sos_list, max_sos, min_sos):
     with open('sos.py', 'w') as sos_file:
         sos_file.write('SOS = {\n')
         for pair in sos_list:
             name, sos = pair
             sos_file.write('    "%s": %s,\n' % (name, sos))
         sos_file.write('}\n')
+        sos_file.write('MIN_SOS = %s\n' % min_sos)
+        sos_file.write('MAX_SOS = %s\n' % max_sos)
 
 
 def write_team_stats_file(nickname, stats):
@@ -127,8 +136,8 @@ def main():
     if not stats_page:
         print 'Error retrieving stats page'
         return None
-    sos_list = parse_stats_page(stats_page, rankings)
-    save_sos_list(sos_list)
+    sos_list, max_sos, min_sos = parse_stats_page(stats_page, rankings)
+    save_sos_list(sos_list, max_sos, min_sos)
 
 
 if __name__ == "__main__":

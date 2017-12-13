@@ -69,3 +69,21 @@ def include_wins_and_losses(stats, wins, losses, away=False):
         stats['losses'] = losses
         stats['win_pct'] = win_percentage
     return stats
+
+
+def weighted_sos(stats, sos, win_pct, max_sos=None, min_sos=None, away=False):
+    try:
+        from sos import MAX_SOS
+        from sos import MIN_SOS
+        min_sos = MIN_SOS
+        max_sos = MAX_SOS
+    except ImportError:
+        pass
+    sos_range = max_sos - min_sos
+    weighted_sos = sos - min_sos
+    weighted_sos *= win_pct
+    if away:
+        stats['opp_weighted_sos'] = weighted_sos
+    else:
+        stats['weighted_sos'] = weighted_sos
+    return stats

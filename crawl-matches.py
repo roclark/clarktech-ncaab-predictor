@@ -2,7 +2,10 @@ import csv
 import os
 import re
 from bs4 import BeautifulSoup
-from common import include_team_rank, include_wins_and_losses, make_request
+from common import (include_team_rank,
+                    include_wins_and_losses,
+                    make_request,
+                    weighted_sos)
 from constants import YEAR
 from requests import Session
 from sos import SOS
@@ -58,7 +61,6 @@ def check_if_team_ranked(teams):
 
 
 def include_sos(stats, name, away=False):
-    print name, SOS[name]
     if away:
         stats['opp_sos'] = SOS[name]
     else:
@@ -157,6 +159,8 @@ def get_match_data(session, matches):
         stats = include_wins_and_losses(stats, *records[1])
         stats = include_sos(stats, home_name)
         stats = include_sos(stats, away_name, away=True)
+        stats = weighted_sos(stats, SOS[home_name], stats['win_pct'])
+        stats = weighted_sos(stats, SOS[away_name], stats['win_pct'], away=True)
         save_match_stats(match_name, stats)
 
 
