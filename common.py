@@ -1,4 +1,5 @@
 import numpy
+import pandas as pd
 import requests
 
 
@@ -44,6 +45,10 @@ def include_team_rank(team_stats, ranking, away=False):
     return team_stats
 
 
+def read_team_stats_file(team_filename):
+    return pd.read_csv(team_filename)
+
+
 def make_request(session, url):
     # Try a URL 3 times. If it still doesn't work, just skip the entry.
     for i in xrange(3):
@@ -69,6 +74,16 @@ def include_wins_and_losses(stats, wins, losses, away=False):
         stats['losses'] = losses
         stats['win_pct'] = win_percentage
     return stats
+
+
+def filter_stats(match_stats):
+    fields_to_drop = ['pts', 'opp_pts', 'g', 'opp_g']
+    fields_to_rename = {'win_loss_pct': 'win_pct',
+                        'opp_win_loss_pct': 'opp_win_pct'}
+    for field in fields_to_drop:
+        match_stats.drop(field, 1, inplace=True)
+    match_stats.rename(columns=fields_to_rename, inplace=True)
+    return match_stats
 
 
 def weighted_sos(stats, sos, win_pct, max_sos=None, min_sos=None, away=False):
