@@ -4,7 +4,7 @@ import pandas as pd
 import re
 import requests
 from bs4 import BeautifulSoup
-from common import filter_stats, read_team_stats_file
+from common import differential_vector, read_team_stats_file
 from constants import YEAR
 from datetime import datetime
 from predictor import Predictor
@@ -84,18 +84,9 @@ def extract_stats_components(stats, away=False):
     return stats
 
 
-def filter_stats(match_stats):
-    fields_to_drop = ['pts', 'opp_pts', 'g', 'opp_g']
-    fields_to_rename = {'win_loss_pct': 'win_pct',
-                        'opp_win_loss_pct': 'opp_win_pct'}
-    for field in fields_to_drop:
-        match_stats.drop(field, 1, inplace=True)
-    match_stats.rename(columns=fields_to_rename, inplace=True)
-    return match_stats
-
-
 def parse_boxscores(boxscore_html, predictor):
     games_list = []
+    fields_to_rename = {'win_loss_pct': 'win_pct'}
     prediction_stats = pd.DataFrame()
 
     games_table = boxscore_html.find('div', {'class': 'game_summaries'})
@@ -111,10 +102,11 @@ def parse_boxscores(boxscore_html, predictor):
         away_filter = extract_stats_components(away_stats, away=True)
         home_filter = extract_stats_components(home_stats, away=False)
         match_stats = pd.concat([away_filter, home_filter], axis=1)
-        match_stats = filter_stats(match_stats)
         prediction_stats = prediction_stats.append(match_stats)
         games_list.append(['%s at %s' % (away, home), [home, away]])
-    match_stats_simplified = predictor.simplify(prediction_stats)
+    differential_stats_vector = differential_vector(prediction_stats)
+    differential_stats_vector.rename(columns=fields_to_rename, inplace=True)
+    match_stats_simplified = predictor.simplify(differential_stats_vector)
     predictions = predictor.predict(match_stats_simplified, int)
     for i in range(0, len(games_list)):
         print games_list[i][0], games_list[i][1][predictions[i]]

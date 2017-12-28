@@ -5,6 +5,7 @@ import re
 import requests
 from bs4 import BeautifulSoup
 from conferences import CONFERENCES
+from common import differential_vector
 from constants import YEAR
 from datetime import datetime
 from predictor import Predictor
@@ -80,8 +81,9 @@ def predict_all_matches(predictor, stats_dict, conference):
             match_stats = pd.concat([away_stats, home_stats], axis=1)
             prediction_stats = prediction_stats.append(match_stats)
             games_list.append([home_team, away_team])
-    prediction_stats.rename(columns=fields_to_rename, inplace=True)
-    match_stats_simplified = predictor.simplify(prediction_stats)
+    match_vector = differential_vector(prediction_stats)
+    match_vector.rename(columns=fields_to_rename, inplace=True)
+    match_stats_simplified = predictor.simplify(match_vector)
     predictions = predictor.predict(match_stats_simplified, int)
     team_wins = get_totals(games_list, predictions, team_wins)
     return team_wins

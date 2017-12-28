@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+from common import differential_vector
 from glob import glob
 from sklearn import tree
 from sklearn.externals.six import StringIO
@@ -61,13 +62,11 @@ class Predictor:
 
         for match in glob('%s/*' % data_directory):
             data = data.append(pd.read_csv(match))
-        return data
+        return differential_vector(data)
 
     def _create_features(self, data):
         self._targets = data.home_win
-        train = data.drop('home_win', 1)
-        train.drop('pts', 1, inplace=True)
-        self._train = train.drop('opp_pts', 1)
+        self._train = data.drop('home_win', 1)
 
     def _create_classifier(self):
         clf = RandomForestClassifier(n_estimators=50, max_features='sqrt')

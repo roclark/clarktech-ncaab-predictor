@@ -3,6 +3,40 @@ import pandas as pd
 import requests
 
 
+FIELDS_TO_COMBINE = {
+    'pts': 'opp_pts',
+    'fg2a': 'opp_fg2a',
+    'losses': 'opp_losses',
+    'sos': 'opp_sos',
+    'trb': 'opp_trb',
+    'fg_pct': 'opp_fg_pct',
+    'fg2': 'opp_fg2',
+    'fg3': 'opp_fg3',
+    'win_pct': 'opp_win_pct',
+    'weighted_sos': 'opp_weighted_sos',
+    'fg3_pct': 'opp_fg3_pct',
+    'tov': 'opp_tov',
+    'fta': 'opp_fta',
+    'mp': 'opp_mp',
+    'stl': 'opp_stl',
+    'fg3a': 'opp_fg3a',
+    'pf': 'opp_pf',
+    'blk': 'opp_blk',
+    'ft_pct': 'opp_ft_pct',
+    'ft': 'opp_ft',
+    'orb': 'opp_orb',
+    'ast': 'opp_ast',
+    'fg': 'opp_fg',
+    'fga': 'opp_fga',
+    'tov': 'opp_tov',
+    'wins': 'opp_wins',
+    'drb': 'opp_drb',
+    'fg2_pct': 'opp_fg2_pct',
+    'ranked': 'opp_ranked',
+    'win_loss_pct': 'opp_win_loss_pct'
+}
+
+
 def include_team_rank(team_stats, ranking, away=False):
     tier1 = 'rank1-5'
     tier2 = 'rank6-10'
@@ -101,4 +135,14 @@ def weighted_sos(stats, sos, win_pct, max_sos=None, min_sos=None, away=False):
         stats['opp_weighted_sos'] = weighted_sos
     else:
         stats['weighted_sos'] = weighted_sos
+    return stats
+
+
+def differential_vector(stats):
+    for home_feature, away_feature in FIELDS_TO_COMBINE.items():
+        try:
+            stats[home_feature] = stats[home_feature] - stats[away_feature]
+            stats.drop(away_feature, 1, inplace=True)
+        except KeyError:
+            continue
     return stats

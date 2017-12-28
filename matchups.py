@@ -4,7 +4,7 @@ import pandas as pd
 import re
 import requests
 from bs4 import BeautifulSoup
-from common import filter_stats, read_team_stats_file
+from common import differential_vector, filter_stats, read_team_stats_file
 from constants import YEAR
 from datetime import datetime
 from predictor import Predictor
@@ -91,6 +91,7 @@ def main():
     args = arguments()
     predictor = Predictor(args.dataset)
     match_stats = create_matchup_stats(args.home, args.away)
+    match_stats = differential_vector(match_stats)
     match_stats_simplified = predictor.simplify(match_stats)
     prediction = predictor.predict(match_stats_simplified, int)
     if prediction[0] == 1:
