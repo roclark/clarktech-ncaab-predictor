@@ -45,14 +45,6 @@ def extract_stats_components(stats, away=False):
     return stats
 
 
-def filter_stats(match_stats):
-    fields_to_drop = ['pts', 'opp_pts', 'opp_g', 'opp_pts_per_g',
-                      'pts_per_g']
-    for field in fields_to_drop:
-        match_stats.drop(field, 1, inplace=True)
-    return match_stats
-
-
 def get_totals(games_list, predictions, team_wins):
     for i in range(0, len(games_list)):
         winner = games_list[i][predictions[i]]
@@ -61,6 +53,8 @@ def get_totals(games_list, predictions, team_wins):
 
 
 def predict_all_matches(predictor, stats_dict):
+    fields_to_rename = {'win_loss_pct': 'win_pct',
+                        'opp_win_loss_pct': 'opp_win_pct'}
     games_list = []
     prediction_stats = pd.DataFrame()
     team_wins = {}
@@ -76,6 +70,7 @@ def predict_all_matches(predictor, stats_dict):
             match_stats = pd.concat([away_stats, home_stats], axis=1)
             prediction_stats = prediction_stats.append(match_stats)
             games_list.append([home_team, away_team])
+    prediction_stats.rename(columns=fields_to_rename, inplace=True)
     match_stats_simplified = predictor.simplify(prediction_stats)
     predictions = predictor.predict(match_stats_simplified, int)
     team_wins = get_totals(games_list, predictions, team_wins)
@@ -87,7 +82,6 @@ def create_stats_dictionary():
 
     for team in TEAMS.values():
         stats = read_team_stats_file('team-stats/%s' % team)
-        stats = filter_stats(stats)
         home_stats = extract_stats_components(stats)
         away_stats = extract_stats_components(stats, away=True)
         stats_dict[team] = home_stats
