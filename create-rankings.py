@@ -1,8 +1,10 @@
+import argparse
 import numpy
 import pandas as pd
 import re
 import requests
 from bs4 import BeautifulSoup
+from conferences import CONFERENCES
 from constants import YEAR
 from datetime import datetime
 from predictor import Predictor
@@ -52,17 +54,25 @@ def get_totals(games_list, predictions, team_wins):
     return team_wins
 
 
-def predict_all_matches(predictor, stats_dict):
+def teams_list(conference):
+    if not conference:
+        teams = TEAMS.values()
+    else:
+        teams = CONFERENCES[conference]
+    return teams
+
+
+def predict_all_matches(predictor, stats_dict, conference):
     fields_to_rename = {'win_loss_pct': 'win_pct',
                         'opp_win_loss_pct': 'opp_win_pct'}
     games_list = []
     prediction_stats = pd.DataFrame()
     team_wins = {}
 
-    for home_team in TEAMS.values():
+    for home_team in teams_list(conference):
         team_wins[home_team] = 0
         print home_team
-        for away_team in TEAMS.values():
+        for away_team in teams_list(conference):
             if home_team == away_team:
                 continue
             home_stats = stats_dict[home_team]
@@ -77,10 +87,10 @@ def predict_all_matches(predictor, stats_dict):
     return team_wins
 
 
-def create_stats_dictionary():
+def create_stats_dictionary(conference):
     stats_dict = {}
 
-    for team in TEAMS.values():
+    for team in teams_list(conference):
         stats = read_team_stats_file('team-stats/%s' % team)
         home_stats = extract_stats_components(stats)
         away_stats = extract_stats_components(stats, away=True)
@@ -99,10 +109,20 @@ def print_rankings(team_wins):
         i += 1
 
 
+def parse_arguments():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--conference', help='Optionally specify a particular '
+    'conference to analyze the power rankings for. For example, specify "Big '
+    'Ten Conference" to get power rankings only comprising the Big Ten teams.',
+    default=None)
+    return parser.parse_args()
+
+
 def main():
+    args = parse_arguments()
     predictor = Predictor()
-    stats_dict = create_stats_dictionary()
-    team_wins = predict_all_matches(predictor, stats_dict)
+    stats_dict = create_stats_dictionary(args.conference)
+    team_wins = predict_all_matches(predictor, stats_dict, args.conference)
     print_rankings(team_wins)
 
 

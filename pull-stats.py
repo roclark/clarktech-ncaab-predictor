@@ -7,6 +7,7 @@ from constants import YEAR
 from requests import Session
 
 
+CONFERENCE_PAGE = 'https://www.sports-reference.com/cbb/seasons/%s.html'
 RANKINGS_PAGE = 'https://www.sports-reference.com/cbb/seasons/%s-polls.html'
 STATS_PAGE = 'http://www.sports-reference.com/cbb/seasons/%s-school-stats.html'
 
@@ -90,6 +91,14 @@ def save_sos_list(sos_list, max_sos, min_sos):
         sos_file.write('MAX_SOS = %s\n' % max_sos)
 
 
+def save_conferences(conferences_dict):
+    with open('conferences.py', 'w') as conf_file:
+        conf_file.write('CONFERENCES = {\n')
+        for conf_name, teams in conferences_dict.items():
+            conf_file.write('    "%s": %s,\n' % (conf_name, teams))
+        conf_file.write('}\n')
+
+
 def write_team_stats_file(nickname, stats):
     header = stats.keys()
 
@@ -127,10 +136,44 @@ def get_rankings(session):
     return rankings_dict
 
 
+def get_conference_teams(session, conference_uri):
+    teams = []
+
+    url = 'http://www.sports-reference.com%s' % conference_uri
+    conference_page = make_request(session, url)
+    conference_html = BeautifulSoup(conference_page.text, 'lxml')
+    body = conference_html.tbody
+    for row in body.find_all('tr'):
+        for stat in row.find_all('td'):
+            if str(dict(stat.attrs).get('data-stat')) == 'school_name':
+                name = str(stat).replace('<a href="/cbb/schools/', '')
+                name = re.sub('/.*', '', name)
+                name = re.sub('.*>', '', name)
+                teams.append(name)
+    return teams
+
+
+def get_conferences(session):
+    conference_dict = {}
+
+    conference_page = make_request(session, CONFERENCE_PAGE % YEAR)
+    conference_html = BeautifulSoup(conference_page.text, 'lxml')
+    body = conference_html.tbody
+    for row in body.find_all('tr'):
+        for stat in row.find_all('td'):
+            if str(dict(stat.attrs).get('data-stat')) == 'conf_name':
+                conf_name = stat.get_text()
+                conf_uri = stat.a['href']
+                teams = get_conference_teams(session, conf_uri)
+                conference_dict[conf_name] = teams
+    return conference_dict
+
+
 def main():
     session = Session()
     session.trust_env = False
 
+    conferences = get_conferences(session)
     rankings = get_rankings(session)
     stats_page = get_stats_page(session)
     if not stats_page:
@@ -138,6 +181,7 @@ def main():
         return None
     sos_list, max_sos, min_sos = parse_stats_page(stats_page, rankings)
     save_sos_list(sos_list, max_sos, min_sos)
+    save_conferences(conferences)
 
 
 if __name__ == "__main__":
