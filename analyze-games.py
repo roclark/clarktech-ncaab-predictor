@@ -11,8 +11,8 @@ from predictor import Predictor
 from teams import TEAMS
 
 
-AWAY = 1
-HOME = 0
+AWAY = 0
+HOME = 1
 TEAM_NAME_REGEX = 'schools/.*?/%s.html' % YEAR
 SCORES_PAGE = 'http://www.sports-reference.com/cbb/boxscores/index.cgi?month='
 
@@ -92,7 +92,7 @@ def parse_boxscores(boxscore_html, predictor):
     games_table = boxscore_html.find('div', {'class': 'game_summaries'})
     games = games_table.find_all('tbody')
     for game in games:
-        home, away = extract_teams_from_game(game)
+        away, home = extract_teams_from_game(game)
         if away is None or home is None:
             # Occurs when a DI school plays a non-DI school
             # The parser does not save stats for non-DI schools
