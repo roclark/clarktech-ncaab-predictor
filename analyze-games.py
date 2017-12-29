@@ -27,20 +27,31 @@ def retrieve_todays_url():
 
 
 def extract_teams_from_game(game_table):
+    top_25 = False
+
     teams = game_table.find_all('a')
+    ranks = re.findall('<a .*?</td>', str(game_table))
     try:
         away_team = re.findall(TEAM_NAME_REGEX, str(teams[AWAY]))[0]
         away_team = away_team.replace('schools/', '')
         away_team = away_team.replace('/%s.html' % YEAR, '')
+        away_rank = re.findall('\(\d+\)', ranks[AWAY])
+        if len(away_rank) > 0:
+            away_team = '%s %s' % (away_rank[0], away_team)
+            top_25 = True
     except IndexError:
-        return None, None
+        return None, None, None
     try:
         home_team = re.findall(TEAM_NAME_REGEX, str(teams[HOME]))[0]
         home_team = home_team.replace('schools/', '')
         home_team = home_team.replace('/%s.html' % YEAR, '')
+        home_rank = re.findall('\(\d+\)', ranks[HOME])
+        if len(home_rank) > 0:
+            home_team = '%s %s' % (home_rank[0], home_team)
+            top_25 = True
     except IndexError:
-        return None, None
-    return away_team, home_team
+        return None, None, None
+    return away_team, home_team, top_25
 
 
 def save_predictions(predictions):
@@ -51,11 +62,8 @@ def save_predictions(predictions):
             prediction_file.write('%s,%s\n' % (prediction[0], prediction[1]))
 
 
-def display_predictions(predictions):
-    max_word_length = max(len(prediction[0]) for prediction in predictions)
-    for prediction in predictions:
-        teams = prediction[0].ljust(max_word_length + 3)
-        print '%s => %s' % (teams, prediction[1])
+def display_prediction(matchup, result):
+    print '%s => %s' % (matchup, result)
 
 
 def convert_team_totals_to_averages(stats):
@@ -86,13 +94,15 @@ def extract_stats_components(stats, away=False):
 
 def parse_boxscores(boxscore_html, predictor):
     games_list = []
+    t_25_games_list = []
     fields_to_rename = {'win_loss_pct': 'win_pct'}
     prediction_stats = pd.DataFrame()
+    t_25_predictions = pd.DataFrame()
 
     games_table = boxscore_html.find('div', {'class': 'game_summaries'})
     games = games_table.find_all('tbody')
     for game in games:
-        away, home = extract_teams_from_game(game)
+        away, home, top_25 = extract_teams_from_game(game)
         if away is None or home is None:
             # Occurs when a DI school plays a non-DI school
             # The parser does not save stats for non-DI schools
@@ -102,14 +112,26 @@ def parse_boxscores(boxscore_html, predictor):
         away_filter = extract_stats_components(away_stats, away=True)
         home_filter = extract_stats_components(home_stats, away=False)
         match_stats = pd.concat([away_filter, home_filter], axis=1)
-        prediction_stats = prediction_stats.append(match_stats)
-        games_list.append(['%s at %s' % (away, home), [home, away]])
-    differential_stats_vector = differential_vector(prediction_stats)
-    differential_stats_vector.rename(columns=fields_to_rename, inplace=True)
-    match_stats_simplified = predictor.simplify(differential_stats_vector)
-    predictions = predictor.predict(match_stats_simplified, int)
-    for i in range(0, len(games_list)):
-        print games_list[i][0], games_list[i][1][predictions[i]]
+        if top_25:
+            t_25_games_list.append(['%s at %s' % (away, home), [home, away]])
+            t_25_predictions = t_25_predictions.append(match_stats)
+        else:
+            games_list.append(['%s at %s' % (away, home), [home, away]])
+            prediction_stats = prediction_stats.append(match_stats)
+    for dataset in [[t_25_predictions, t_25_games_list, 'Top 25 Games'],
+                    [prediction_stats, games_list, 'NCAA Division-I Games']]:
+        prediction_stats, games_list, heading = dataset
+        print '=' * 80
+        print '  %s' % heading
+        print '=' * 80
+        differential_stats_vector = differential_vector(prediction_stats)
+        differential_stats_vector.rename(columns=fields_to_rename, inplace=True)
+        match_stats_simplified = predictor.simplify(differential_stats_vector)
+        predictions = predictor.predict(match_stats_simplified, int)
+        for i in range(0, len(games_list)):
+            display_prediction(games_list[i][0],
+                               games_list[i][1][predictions[i]])
+    print '=' * 80
 
 
 def find_todays_games(predictor):

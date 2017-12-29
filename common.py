@@ -1,5 +1,6 @@
 import numpy
 import pandas as pd
+import re
 import requests
 
 
@@ -80,6 +81,7 @@ def include_team_rank(team_stats, ranking, away=False):
 
 
 def read_team_stats_file(team_filename):
+    team_filename = re.sub('\(\d+\) +', '', team_filename)
     return pd.read_csv(team_filename)
 
 
