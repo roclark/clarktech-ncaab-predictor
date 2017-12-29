@@ -174,6 +174,7 @@ def parse_boxscores(boxscore_html, predictor):
         differential_stats_vector.rename(columns=fields_to_rename, inplace=True)
         match_stats_simplified = predictor.simplify(differential_stats_vector)
         predictions = predictor.predict(match_stats_simplified, int)
+        probabilities = predictor.predict_probability(match_stats_simplified)
         for i in range(0, len(games_list)):
             winner = games_list[i][1][predictions[i]]
             loser = games_list[i][1][abs(predictions[i]-1)]

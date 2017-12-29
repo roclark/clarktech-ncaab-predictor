@@ -54,6 +54,9 @@ class Predictor:
         self._model.fit(self._train, self._targets)
         return self._test
 
+    def predict_probability(self, test_data):
+        return self._reduced_clf.predict_proba(test_data)
+
     def predict(self, test_data, output_datatype):
         return self._model.predict(test_data).astype(output_datatype)
 
@@ -75,5 +78,8 @@ class Predictor:
         train = self._train
         self._model = SelectFromModel(self._classifier, prefit=True)
         self._train = self._model.transform(self._train)
+        reduced_clf = RandomForestClassifier(n_estimators=50,
+                                             max_features='sqrt')
+        self._reduced_clf = reduced_clf.fit(self._train, self._targets)
         new_columns = train.columns[self._model.get_support()]
         self._filtered_features = [str(col) for col in new_columns]
