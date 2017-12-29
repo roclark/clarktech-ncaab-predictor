@@ -73,7 +73,7 @@ def create_matchup_stats(home_team, away_team):
     away_stats = extract_stats_components(away_stats, away=True)
     home_stats = extract_stats_components(home_stats)
     match_stats = pd.concat([away_stats, home_stats], axis=1)
-    return filter_stats(match_stats)
+    return match_stats
 
 
 def arguments():
@@ -88,9 +88,13 @@ def arguments():
 
 
 def main():
+    fields_to_rename = {'win_loss_pct': 'win_pct',
+                        'opp_win_loss_pct': 'opp_win_pct'}
+
     args = arguments()
     predictor = Predictor(args.dataset)
     match_stats = create_matchup_stats(args.home, args.away)
+    match_stats.rename(columns=fields_to_rename, inplace=True)
     match_stats = differential_vector(match_stats)
     match_stats_simplified = predictor.simplify(match_stats)
     prediction = predictor.predict(match_stats_simplified, int)
