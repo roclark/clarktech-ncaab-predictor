@@ -47,10 +47,12 @@ def extract_stats_components(stats, away=False):
     return stats
 
 
-def get_totals(games_list, predictions, team_wins):
+def get_totals(games_list, predictions, team_wins, probabilities):
     for i in range(0, len(games_list)):
         winner = games_list[i][predictions[i]]
-        team_wins[winner] += 1
+        loser = games_list[i][abs(predictions[i] - 1)]
+        team_wins[winner] += max(probabilities[i])
+        team_wins[loser] += min(probabilities[i])
     return team_wins
 
 
@@ -99,6 +101,7 @@ def predict_all_matches(predictor, stats_dict, teams):
         match_vector.rename(columns=fields_to_rename, inplace=True)
         match_stats_simplified = predictor.simplify(match_vector)
         predictions = predictor.predict(match_stats_simplified, int)
+        probabilities = predictor.predict_probability(match_stats_simplified)
         team_wins = get_totals(games_list, predictions, team_wins)
     return team_wins
 
