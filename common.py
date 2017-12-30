@@ -1,3 +1,4 @@
+import difflib
 import numpy
 import pandas as pd
 import re
@@ -148,3 +149,23 @@ def differential_vector(stats):
         except KeyError:
             continue
     return stats
+
+
+def find_name_from_nickname(nickname):
+    from teams import TEAMS
+
+    nickname = difflib.get_close_matches(nickname, TEAMS.values())[0]
+    for key, value in TEAMS.items():
+        if value == nickname:
+            return key
+
+
+def find_nickname_from_name(name):
+    from teams import TEAMS
+
+    try:
+        nickname = TEAMS[name]
+    except KeyError:
+        name = difflib.get_close_matches(name, TEAMS.keys())[0]
+        nickname = TEAMS[name]
+    return nickname

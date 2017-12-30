@@ -4,7 +4,9 @@ import pandas as pd
 import re
 import requests
 from bs4 import BeautifulSoup
-from common import differential_vector, read_team_stats_file
+from common import (differential_vector,
+                    find_name_from_nickname,
+                    read_team_stats_file)
 from constants import YEAR
 from datetime import datetime
 from predictor import Predictor
@@ -35,23 +37,25 @@ def extract_teams_from_game(game_table):
         away_team = re.findall(TEAM_NAME_REGEX, str(teams[AWAY]))[0]
         away_team = away_team.replace('schools/', '')
         away_team = away_team.replace('/%s.html' % YEAR, '')
+        away_name = find_name_from_nickname(away_team)
         away_rank = re.findall('\(\d+\)', ranks[AWAY])
         if len(away_rank) > 0:
-            away_team = '%s %s' % (away_rank[0], away_team)
+            away_name = '%s %s' % (away_rank[0], away_name)
             top_25 = True
     except IndexError:
-        return None, None, None
+        return None, None, None, None, None
     try:
         home_team = re.findall(TEAM_NAME_REGEX, str(teams[HOME]))[0]
         home_team = home_team.replace('schools/', '')
         home_team = home_team.replace('/%s.html' % YEAR, '')
+        home_name = find_name_from_nickname(home_team)
         home_rank = re.findall('\(\d+\)', ranks[HOME])
         if len(home_rank) > 0:
-            home_team = '%s %s' % (home_rank[0], home_team)
+            home_name = '%s %s' % (home_rank[0], home_name)
             top_25 = True
     except IndexError:
-        return None, None, None
-    return away_team, home_team, top_25
+        return None, None, None, None, None
+    return away_team, home_team, away_name, home_name, top_25
 
 
 def save_predictions(predictions):
@@ -102,7 +106,7 @@ def parse_boxscores(boxscore_html, predictor):
     games_table = boxscore_html.find('div', {'class': 'game_summaries'})
     games = games_table.find_all('tbody')
     for game in games:
-        away, home, top_25 = extract_teams_from_game(game)
+        away, home, away_name, home_name, top_25 = extract_teams_from_game(game)
         if away is None or home is None:
             # Occurs when a DI school plays a non-DI school
             # The parser does not save stats for non-DI schools
@@ -113,10 +117,12 @@ def parse_boxscores(boxscore_html, predictor):
         home_filter = extract_stats_components(home_stats, away=False)
         match_stats = pd.concat([away_filter, home_filter], axis=1)
         if top_25:
-            t_25_games_list.append(['%s at %s' % (away, home), [home, away]])
+            t_25_games_list.append(['%s at %s' % (away_name, home_name),
+                                   [home_name, away_name]])
             t_25_predictions = t_25_predictions.append(match_stats)
         else:
-            games_list.append(['%s at %s' % (away, home), [home, away]])
+            games_list.append(['%s at %s' % (away_name, home_name),
+                              [home_name, away_name]])
             prediction_stats = prediction_stats.append(match_stats)
     for dataset in [[t_25_predictions, t_25_games_list, 'Top 25 Games'],
                     [prediction_stats, games_list, 'NCAA Division-I Games']]:

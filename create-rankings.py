@@ -5,7 +5,7 @@ import re
 import requests
 from bs4 import BeautifulSoup
 from conferences import CONFERENCES
-from common import differential_vector
+from common import differential_vector, find_name_from_nickname
 from constants import YEAR
 from datetime import datetime
 from predictor import Predictor
@@ -107,6 +107,7 @@ def print_rankings(team_wins):
     sorted_ranks = [(v,k) for k,v in team_wins.iteritems()]
     sorted_ranks.sort(reverse=True)
     for wins, team in sorted_ranks:
+        team = find_name_from_nickname(team)
         print '%s. %s: %s' % (str(i).rjust(3), team, wins)
         i += 1
 
