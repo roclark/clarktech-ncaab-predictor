@@ -1,5 +1,6 @@
 import argparse
 import numpy
+import os
 import pandas as pd
 import re
 import requests
@@ -7,9 +8,11 @@ from bs4 import BeautifulSoup
 from common import (differential_vector,
                     find_name_from_nickname,
                     read_team_stats_file)
+from conferences import CONFERENCES
 from constants import YEAR
 from datetime import datetime
 from predictor import Predictor
+from save_json import save_json
 from teams import TEAMS
 
 
@@ -60,10 +63,10 @@ def extract_teams_from_game(game_table):
 
 def save_predictions(predictions):
     today = datetime.now()
+    if not os.path.exists('predictions'):
+        os.makedirs('predictions')
     filename = 'predictions/%s-%s-%s' % (today.month, today.day, today.year)
-    with open(filename, 'w') as prediction_file:
-        for prediction in predictions:
-            prediction_file.write('%s,%s\n' % (prediction[0], prediction[1]))
+    save_json(predictions, filename)
 
 
 def display_prediction(matchup, result):
@@ -96,12 +99,38 @@ def extract_stats_components(stats, away=False):
     return stats
 
 
+def create_prediction_data(home_name, home_nickname, away_name, away_nickname,
+                           top_25, winner, loser, inverted_conferences):
+    tags = []
+    if top_25:
+        tags = ['Top 25']
+    tags.append(inverted_conferences[home_nickname])
+    tags.append(inverted_conferences[away_nickname])
+    tags = list(set(tags))
+    prediction = [tags, home_name, home_nickname, away_name, away_nickname,
+                  winner, loser]
+    return prediction
+
+
+def invert_conference_dict():
+    new_dict = {}
+
+    for conference, value in CONFERENCES.items():
+        for team in value:
+            new_dict[team] = conference
+    return new_dict
+
+
 def parse_boxscores(boxscore_html, predictor):
     games_list = []
+    prediction_list = []
     t_25_games_list = []
+    match_info = []
+    t_25_match_info = []
     fields_to_rename = {'win_loss_pct': 'win_pct'}
     prediction_stats = pd.DataFrame()
     t_25_predictions = pd.DataFrame()
+    inverted_conferences = invert_conference_dict()
 
     games_table = boxscore_html.find('div', {'class': 'game_summaries'})
     games = games_table.find_all('tbody')
@@ -120,13 +149,19 @@ def parse_boxscores(boxscore_html, predictor):
             t_25_games_list.append(['%s at %s' % (away_name, home_name),
                                    [home_name, away_name]])
             t_25_predictions = t_25_predictions.append(match_stats)
+            t_25_match_info.append([home_name, home, away_name, away, top_25])
         else:
             games_list.append(['%s at %s' % (away_name, home_name),
                               [home_name, away_name]])
             prediction_stats = prediction_stats.append(match_stats)
-    for dataset in [[t_25_predictions, t_25_games_list, 'Top 25 Games'],
-                    [prediction_stats, games_list, 'NCAA Division-I Games']]:
-        prediction_stats, games_list, heading = dataset
+            match_info.append([home_name, home, away_name, away, top_25])
+
+    t_25_data = [t_25_predictions, t_25_games_list, 'Top 25 Games',
+                 t_25_match_info]
+    d1_data = [prediction_stats, games_list, 'NCAA Division-I Games',
+               match_info]
+    for dataset in [t_25_data, d1_data]:
+        prediction_stats, games_list, heading, match_info = dataset
         print '=' * 80
         print '  %s' % heading
         print '=' * 80
@@ -135,9 +170,16 @@ def parse_boxscores(boxscore_html, predictor):
         match_stats_simplified = predictor.simplify(differential_stats_vector)
         predictions = predictor.predict(match_stats_simplified, int)
         for i in range(0, len(games_list)):
-            display_prediction(games_list[i][0],
-                               games_list[i][1][predictions[i]])
+            winner = games_list[i][1][predictions[i]]
+            loser = games_list[i][1][abs(predictions[i]-1)]
+            display_prediction(games_list[i][0], winner)
+            home, home_nickname, away, away_nickname, top_25 = match_info[i]
+            p = create_prediction_data(home, home_nickname, away, away_nickname,
+                                       top_25, winner, loser,
+                                       inverted_conferences)
+            prediction_list.append(p)
     print '=' * 80
+    save_predictions(prediction_list)
 
 
 def find_todays_games(predictor):
