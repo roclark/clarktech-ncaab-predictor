@@ -65,7 +65,9 @@ def save_predictions(predictions):
     today = datetime.now()
     if not os.path.exists('predictions'):
         os.makedirs('predictions')
-    filename = 'predictions/%s-%s-%s' % (today.month, today.day, today.year)
+    filename = 'predictions/%s-%s-%s.json' % (today.month,
+                                              today.day,
+                                              today.year)
     save_json(predictions, filename)
 
 
