@@ -4,6 +4,12 @@ import json
 class Prediction:
     def __init__(self, tags, home_name, home_nickname, away_name, away_nickname,
                  winner, loser):
+        if winner == home_name:
+            winner_nickname = home_nickname
+            loser_nickname = away_nickname
+        else:
+            winner_nickname = away_nickname
+            loser_nickname = home_nickname
         self.prediction = {
             "tags": tags,
             "teams": {
@@ -17,8 +23,14 @@ class Prediction:
                 }
             },
             "prediction": {
-                "winner": winner,
-                "loser": loser,
+                "winner": {
+                    "name": winner,
+                    "nickname": winner_nickname,
+                },
+                "loser": {
+                    "name": loser,
+                    "nickname": loser_nickname,
+                }
             }
         }
 
