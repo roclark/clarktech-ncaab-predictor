@@ -160,8 +160,11 @@ def parse_boxscores(boxscore_html, predictor):
                  t_25_match_info]
     d1_data = [prediction_stats, games_list, 'NCAA Division-I Games',
                match_info]
+    games_parsed = 0
     for dataset in [t_25_data, d1_data]:
         prediction_stats, games_list, heading, match_info = dataset
+        if len(games_list) == 0:
+            continue
         print '=' * 80
         print '  %s' % heading
         print '=' * 80
@@ -178,7 +181,12 @@ def parse_boxscores(boxscore_html, predictor):
                                        top_25, winner, loser,
                                        inverted_conferences)
             prediction_list.append(p)
+            games_parsed += 1
     print '=' * 80
+    if games_parsed == 0:
+        print '  No games scheduled for today'
+        print '=' * 80
+        return
     save_predictions(prediction_list)
 
 
