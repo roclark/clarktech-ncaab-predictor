@@ -1,4 +1,5 @@
 import json
+from common import find_nickname_from_name
 
 
 class Prediction:
@@ -35,7 +36,27 @@ class Prediction:
         }
 
 
-def save_json(predictions, output_file):
+class Simulation:
+    def __init__(self, num_sims, results_dict):
+        conferences_list = []
+        for conference, standings in results_dict.items():
+            teams_list = []
+            for name, standings in standings.items():
+                nickname = find_nickname_from_name(name)
+                team_dict = {
+                    "name": name,
+                    "nickname": nickname,
+                    "standings": standings,
+                }
+                teams_list.append(team_dict)
+            conferences_list.append({conference: teams_list})
+        self.simulation = {
+            "num_sims": num_sims,
+            "conferences": conferences_list
+        }
+
+
+def save_predictions_json(predictions, output_file):
     prediction_json = []
     for prediction in predictions:
         p = Prediction(*prediction)
@@ -43,3 +64,9 @@ def save_json(predictions, output_file):
     prediction_json = {"predictions": prediction_json}
     with open(output_file, 'w') as fp:
         json.dump(prediction_json, fp)
+
+
+def save_simulation(num_sims, results_dict, output_file):
+    simulation = Simulation(num_sims, results_dict).__dict__
+    with open(output_file, 'w') as fp:
+        json.dump(simulation, fp)

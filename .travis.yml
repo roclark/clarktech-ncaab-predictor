@@ -16,4 +16,3 @@ install:
 script:
     - python pull-stats.py
     - python analyze-games.py --dataset sample-data
-    - python monte-carlo-simulation.py --conference "Big Ten Conference" --dataset "sample-data"

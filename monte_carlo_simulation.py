@@ -158,6 +158,7 @@ def predict_all_simulations(predictor, stats_dict, stdev_dict, conference,
             standings_dict[team][i] = standings_dict[team][i] + 1
             i += 1
     print_simulation_results(standings_dict, num_sims)
+    return standings_dict
 
 
 def get_conference_wins(team_soup):
@@ -253,14 +254,19 @@ def parse_arguments():
     return parser.parse_args()
 
 
+def start_simulations(predictor, conference, num_sims=NUM_SIMS):
+    stats_dict, stdev_dict = create_stats_dictionary(conference)
+    schedule, conference_wins = get_remaining_schedule(conference)
+    team_wins = predict_all_simulations(predictor, stats_dict, stdev_dict,
+                                        conference, num_sims, schedule,
+                                        conference_wins)
+    return team_wins
+
+
 def main():
     args = parse_arguments()
     predictor = Predictor(args.dataset)
-    stats_dict, stdev_dict = create_stats_dictionary(args.conference)
-    schedule, conference_wins = get_remaining_schedule(args.conference)
-    team_wins = predict_all_simulations(predictor, stats_dict, stdev_dict,
-                                        args.conference, int(args.num_sims),
-                                        schedule, conference_wins)
+    start_simulations(predictor, args.conference, int(args.num_sims))
 
 
 if __name__ == "__main__":

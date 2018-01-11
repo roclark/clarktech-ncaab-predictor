@@ -12,7 +12,7 @@ from conferences import CONFERENCES
 from constants import YEAR
 from datetime import datetime
 from predictor import Predictor
-from save_json import save_json
+from save_json import save_predictions_json
 from teams import TEAMS
 
 
@@ -68,7 +68,7 @@ def save_predictions(predictions):
     filename = 'predictions/%s-%s-%s.json' % (today.month,
                                               today.day,
                                               today.year)
-    save_json(predictions, filename)
+    save_predictions_json(predictions, filename)
 
 
 def display_prediction(matchup, result):
