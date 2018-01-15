@@ -1,4 +1,5 @@
 import csv
+import json
 import re
 import os
 from bs4 import BeautifulSoup
@@ -106,6 +107,8 @@ def write_team_stats_file(nickname, stats):
         dict_writer = csv.DictWriter(team_stats_file, header)
         dict_writer.writeheader()
         dict_writer.writerows([stats])
+    with open('team-stats/%s.json' % nickname, 'w') as stats_json_file:
+        json.dump(stats, stats_json_file)
 
 
 def write_teams_list(teams_list):
