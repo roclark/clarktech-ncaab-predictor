@@ -8,11 +8,13 @@ from save_json import Simulation, save_simulation
 def main():
     predictor = Predictor()
     results_dict = {}
+    points_dict = {}
 
     for conference in CONFERENCES:
-        results = start_simulations(predictor, conference)
+        results, points, num_sims = start_simulations(predictor, conference)
         results_dict[conference] = results
-    save_simulation(NUM_SIMS, results_dict, 'simulations/simulation.json')
+        points_dict[conference] = points
+    save_simulation(NUM_SIMS, results_dict, points_dict, 'simulations/simulation.json')
 
 
 if __name__ == "__main__":

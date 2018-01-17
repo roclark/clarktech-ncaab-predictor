@@ -144,21 +144,32 @@ def print_simulation_results(standings_dict, num_sims):
         print_probabilities_ordered(probabilities)
 
 
+def add_points_total(points_dict, team_wins):
+    for team, wins in team_wins.items():
+        if team in points_dict:
+            points_dict[team] += wins
+        else:
+            points_dict[team] = wins
+    return points_dict
+
+
 def predict_all_simulations(predictor, stats_dict, stdev_dict, conference,
                             num_sims, schedule, conference_wins):
     standings_dict = initialize_standings_dict(conference)
+    points_dict = {}
 
     for iteration in range(num_sims):
         local_stats_dict = create_variance(stats_dict, stdev_dict)
         team_wins = predict_all_matches(predictor, local_stats_dict, conference,
                                         schedule, conference_wins)
+        points_dict = add_points_total(points_dict, team_wins)
         rankings = print_rankings(team_wins)
         i = 0
         for team in rankings:
             standings_dict[team][i] = standings_dict[team][i] + 1
             i += 1
     print_simulation_results(standings_dict, num_sims)
-    return standings_dict
+    return standings_dict, points_dict
 
 
 def get_conference_wins(team_soup):
@@ -257,10 +268,11 @@ def parse_arguments():
 def start_simulations(predictor, conference, num_sims=NUM_SIMS):
     stats_dict, stdev_dict = create_stats_dictionary(conference)
     schedule, conference_wins = get_remaining_schedule(conference)
-    team_wins = predict_all_simulations(predictor, stats_dict, stdev_dict,
-                                        conference, num_sims, schedule,
-                                        conference_wins)
-    return team_wins
+    team_wins, points_dict = predict_all_simulations(predictor, stats_dict,
+                                                     stdev_dict, conference,
+                                                     num_sims, schedule,
+                                                     conference_wins)
+    return team_wins, points_dict, num_sims
 
 
 def main():
