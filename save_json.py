@@ -1,5 +1,6 @@
 import json
 from common import find_nickname_from_name
+from mascots import MASCOTS
 
 
 class Prediction:
@@ -17,20 +18,24 @@ class Prediction:
                 "home": {
                     "name": home_name,
                     "nickname": home_nickname,
+                    "mascot": MASCOTS[home_nickname],
                 },
                 "away": {
                     "name": away_name,
                     "nickname": away_nickname,
+                    "mascot": MASCOTS[away_nickname],
                 }
             },
             "prediction": {
                 "winner": {
                     "name": winner,
                     "nickname": winner_nickname,
+                    "mascot": MASCOTS[winner_nickname],
                 },
                 "loser": {
                     "name": loser,
                     "nickname": loser_nickname,
+                    "mascot": MASCOTS[loser_nickname],
                 }
             }
         }
