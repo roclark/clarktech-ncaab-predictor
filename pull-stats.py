@@ -5,6 +5,7 @@ import os
 from bs4 import BeautifulSoup
 from common import include_team_rank, make_request, weighted_sos
 from constants import YEAR
+from mascots import MASCOTS
 from requests import Session
 
 
@@ -31,7 +32,7 @@ def add_categories(stats):
     return stats
 
 
-def parse_stats_page(stats_page, rankings):
+def parse_stats_page(stats_page, rankings, conferences):
     sos_list = []
     teams_list = []
 
@@ -69,7 +70,7 @@ def parse_stats_page(stats_page, rankings):
         stats = include_team_rank(stats, rank)
         stats = weighted_sos(stats, float(sos), stats['win_loss_pct'], max_sos,
                              min_sos)
-        write_team_stats_file(nickname, stats)
+        write_team_stats_file(nickname, stats, name, rankings, conferences)
         teams_list.append([name, nickname])
         sos_list.append([str(nickname), str(sos)])
     write_teams_list(teams_list)
@@ -100,7 +101,7 @@ def save_conferences(conferences_dict):
         conf_file.write('}\n')
 
 
-def write_team_stats_file(nickname, stats):
+def write_team_stats_file(nickname, stats, name, rankings, conferences):
     header = stats.keys()
 
     with open('team-stats/%s' % nickname, 'w') as team_stats_file:
@@ -108,6 +109,16 @@ def write_team_stats_file(nickname, stats):
         dict_writer.writeheader()
         dict_writer.writerows([stats])
     with open('team-stats/%s.json' % nickname, 'w') as stats_json_file:
+        stats["name"] = name
+        try:
+            stats["rank"] = rankings[nickname]
+        except KeyError:
+            stats["rank"] = "NR"
+        for key, value in conferences.items():
+            if nickname in value:
+                stats["conference"] = key
+                break
+        stats["mascot"] = MASCOTS[nickname]
         json.dump(stats, stats_json_file)
 
 
@@ -182,7 +193,8 @@ def main():
     if not stats_page:
         print 'Error retrieving stats page'
         return None
-    sos_list, max_sos, min_sos = parse_stats_page(stats_page, rankings)
+    sos_list, max_sos, min_sos = parse_stats_page(stats_page, rankings,
+                                                  conferences)
     save_sos_list(sos_list, max_sos, min_sos)
     save_conferences(conferences)
 
