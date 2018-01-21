@@ -15,7 +15,6 @@ from teams import TEAMS
 AWAY = 1
 HOME = 0
 TEAM_NAME_REGEX = 'schools/.*?/%s.html' % YEAR
-SCORES_PAGE = 'http://www.sports-reference.com/cbb/boxscores/index.cgi?month='
 
 
 def read_team_stats_file(team_filename):
@@ -63,36 +62,51 @@ def teams_list(conference):
     return teams
 
 
-def predict_all_matches(predictor, stats_dict, conference):
-    fields_to_rename = {'win_loss_pct': 'win_pct',
-                        'opp_win_loss_pct': 'opp_win_pct'}
-    games_list = []
-    prediction_stats = pd.DataFrame()
+def split_datasets(dataset, set_size):
+    for i in xrange(0, len(dataset), set_size):
+        yield dataset[i:i+set_size]
+
+
+def initialize_team_wins(teams):
     team_wins = {}
 
-    for home_team in teams_list(conference):
-        team_wins[home_team] = 0
-        print home_team
-        for away_team in teams_list(conference):
-            if home_team == away_team:
-                continue
-            home_stats = stats_dict[home_team]
-            away_stats = stats_dict['%s_away' % away_team]
-            match_stats = pd.concat([away_stats, home_stats], axis=1)
-            prediction_stats = prediction_stats.append(match_stats)
-            games_list.append([home_team, away_team])
-    match_vector = differential_vector(prediction_stats)
-    match_vector.rename(columns=fields_to_rename, inplace=True)
-    match_stats_simplified = predictor.simplify(match_vector)
-    predictions = predictor.predict(match_stats_simplified, int)
-    team_wins = get_totals(games_list, predictions, team_wins)
+    for team in teams:
+        team_wins[team] = 0
     return team_wins
 
 
-def create_stats_dictionary(conference):
+def predict_all_matches(predictor, stats_dict, teams):
+    fields_to_rename = {'win_loss_pct': 'win_pct',
+                        'opp_win_loss_pct': 'opp_win_pct'}
+    team_wins = initialize_team_wins(teams)
+
+    for dataset in split_datasets(teams, 75):
+        games_list = []
+        prediction_stats = pd.DataFrame()
+        match_stats = []
+        for home_team in dataset:
+            team_wins[home_team] = 0
+            print home_team
+            for away_team in teams:
+                if home_team == away_team:
+                    continue
+                home_stats = stats_dict[home_team]
+                away_stats = stats_dict['%s_away' % away_team]
+                match_stats.append(pd.concat([away_stats, home_stats], axis=1))
+                games_list.append([home_team, away_team])
+        prediction_stats = pd.concat(match_stats)
+        match_vector = differential_vector(prediction_stats)
+        match_vector.rename(columns=fields_to_rename, inplace=True)
+        match_stats_simplified = predictor.simplify(match_vector)
+        predictions = predictor.predict(match_stats_simplified, int)
+        team_wins = get_totals(games_list, predictions, team_wins)
+    return team_wins
+
+
+def create_stats_dictionary(teams):
     stats_dict = {}
 
-    for team in teams_list(conference):
+    for team in teams:
         stats = read_team_stats_file('team-stats/%s' % team)
         home_stats = extract_stats_components(stats)
         away_stats = extract_stats_components(stats, away=True)
@@ -124,8 +138,9 @@ def parse_arguments():
 def main():
     args = parse_arguments()
     predictor = Predictor()
-    stats_dict = create_stats_dictionary(args.conference)
-    team_wins = predict_all_matches(predictor, stats_dict, args.conference)
+    teams = teams_list(args.conference)
+    stats_dict = create_stats_dictionary(teams)
+    team_wins = predict_all_matches(predictor, stats_dict, teams)
     print_rankings(team_wins)
 
 

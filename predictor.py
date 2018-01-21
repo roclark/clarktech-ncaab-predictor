@@ -58,10 +58,9 @@ class Predictor:
         return self._model.predict(test_data).astype(output_datatype)
 
     def _read_data(self, data_directory):
-        data = pd.DataFrame()
-
-        for match in glob('%s/*' % data_directory):
-            data = data.append(pd.read_csv(match))
+        frames = [pd.read_csv(match) for match in glob('%s/*' % data_directory) \
+                  if not match.endswith('.json')]
+        data = pd.concat(frames)
         return differential_vector(data)
 
     def _create_features(self, data):

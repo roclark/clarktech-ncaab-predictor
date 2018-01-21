@@ -79,6 +79,7 @@ def predict_all_matches(predictor, stats_dict, conference, schedule,
                         'opp_win_loss_pct': 'opp_win_pct'}
     games_list = []
     prediction_stats = pd.DataFrame()
+    match_stats = []
     team_wins = {}
 
     for team in teams_list(conference):
@@ -88,8 +89,8 @@ def predict_all_matches(predictor, stats_dict, conference, schedule,
         home, away = matchup
         home_stats = stats_dict[home]
         away_stats = stats_dict['%s_away' % away]
-        match_stats = pd.concat([away_stats, home_stats], axis=1)
-        prediction_stats = prediction_stats.append(match_stats)
+        match_stats.append(pd.concat([away_stats, home_stats], axis=1))
+    prediction_stats = pd.concat(match_stats)
     match_vector = differential_vector(prediction_stats)
     match_vector.rename(columns=fields_to_rename, inplace=True)
     match_stats_simplified = predictor.simplify(match_vector)
@@ -102,15 +103,14 @@ def create_variance(stats_dict, stdev_dict):
     local_stats_dict = {}
 
     for team, stats in stats_dict.items():
-        local_stats = pd.DataFrame()
+        local_stats = {}
         for stat in stats:
             min_val = -1 * float(stdev_dict[stat])
             max_val = abs(min_val)
             variance = random.uniform(min_val, max_val)
             new_value = float(stats[stat]) + variance
-            local_stats = pd.concat([pd.DataFrame({stat: [new_value]}),
-                                    local_stats], axis=1)
-        local_stats_dict[team] = local_stats
+            local_stats[stat] = new_value
+        local_stats_dict[team] = pd.DataFrame([local_stats])
     return local_stats_dict
 
 
