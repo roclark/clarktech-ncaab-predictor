@@ -4,7 +4,7 @@ import re
 import os
 from bs4 import BeautifulSoup
 from common import include_team_rank, make_request, weighted_sos
-from constants import YEAR
+from constants import POWER_CONFERENCES, YEAR
 from mascots import MASCOTS
 from requests import Session
 
@@ -32,7 +32,7 @@ def add_categories(stats):
     return stats
 
 
-def parse_stats_page(stats_page, rankings, conferences):
+def parse_stats_page(stats_page, rankings, conferences, power_conf_teams):
     sos_list = []
     teams_list = []
 
@@ -62,6 +62,10 @@ def parse_stats_page(stats_page, rankings, conferences):
                 field = 'away_pts'
             value = float(stat.get_text())
             stats[field] = value
+            if nickname in power_conf_teams:
+                stats["power_conf"] = 1
+            else:
+                stats["power_conf"] = 0
         try:
             rank = rankings[nickname]
         except KeyError:
@@ -169,6 +173,7 @@ def get_conference_teams(session, conference_uri):
 
 def get_conferences(session):
     conference_dict = {}
+    power_conference_teams = []
 
     conference_page = make_request(session, CONFERENCE_PAGE % YEAR)
     conference_html = BeautifulSoup(conference_page.text, 'lxml')
@@ -180,21 +185,25 @@ def get_conferences(session):
                 conf_uri = stat.a['href']
                 teams = get_conference_teams(session, conf_uri)
                 conference_dict[conf_name] = teams
-    return conference_dict
+                if conf_name in POWER_CONFERENCES:
+                    power_conference_teams.append(teams)
+    # Flatten the power_conference_teams list of lists
+    power_conference_teams = [x for y in power_conference_teams for x in y]
+    return conference_dict, power_conference_teams
 
 
 def main():
     session = Session()
     session.trust_env = False
 
-    conferences = get_conferences(session)
+    conferences, power_conf_teams = get_conferences(session)
     rankings = get_rankings(session)
     stats_page = get_stats_page(session)
     if not stats_page:
         print 'Error retrieving stats page'
         return None
     sos_list, max_sos, min_sos = parse_stats_page(stats_page, rankings,
-                                                  conferences)
+                                                  conferences, power_conf_teams)
     save_sos_list(sos_list, max_sos, min_sos)
     save_conferences(conferences)
 
