@@ -20,7 +20,7 @@ from teams import TEAMS
 
 AWAY = 1
 HOME = 0
-NUM_SIMS = 100
+NUM_SIMS = 200
 TEAM_NAME_REGEX = 'schools/.*?/%s.html' % YEAR
 SCHEDULE = 'http://www.sports-reference.com/cbb/schools/%s/%s-schedule.html'
 SCORES_PAGE = 'http://www.sports-reference.com/cbb/boxscores/index.cgi?month='
