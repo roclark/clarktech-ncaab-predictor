@@ -1,4 +1,5 @@
 import argparse
+import json
 import numpy
 import os
 import pandas as pd
@@ -19,31 +20,29 @@ from teams import TEAMS
 AWAY = 0
 HOME = 1
 TEAM_NAME_REGEX = 'schools/.*?/%s.html' % YEAR
-SCORES_PAGE = 'http://www.sports-reference.com/cbb/boxscores/index.cgi?month='
+HOME_PAGE = 'http://www.sports-reference.com/cbb/'
 
 
-def retrieve_todays_url():
-    today = datetime.now()
-    url = '%s%s&day=%s&year=%s' % (SCORES_PAGE,
-                                   today.month,
-                                   today.day,
-                                   today.year)
-    return url
+def team_ranked(team):
+    with open('team-stats/%s.json' % team) as json_data:
+        team_stats = json.load(json_data)
+        if team_stats['rank'] != 'NR':
+            return team_stats['rank']
+        return None
 
 
 def extract_teams_from_game(game_table):
     top_25 = False
 
     teams = game_table.find_all('a')
-    ranks = re.findall('<a .*?</td>', str(game_table))
     try:
         away_team = re.findall(TEAM_NAME_REGEX, str(teams[AWAY]))[0]
         away_team = away_team.replace('schools/', '')
         away_team = away_team.replace('/%s.html' % YEAR, '')
-        away_name = find_name_from_nickname(away_team)
-        away_rank = re.findall('\(\d+\)', ranks[AWAY])
-        if len(away_rank) > 0:
-            away_name = '%s %s' % (away_rank[0], away_name)
+        away_name = teams[AWAY].get_text().strip()
+        rank = team_ranked(away_team)
+        if rank:
+            away_name = '(%s) %s' % (rank, away_name)
             top_25 = True
     except IndexError:
         return None, None, None, None, None
@@ -51,14 +50,19 @@ def extract_teams_from_game(game_table):
         home_team = re.findall(TEAM_NAME_REGEX, str(teams[HOME]))[0]
         home_team = home_team.replace('schools/', '')
         home_team = home_team.replace('/%s.html' % YEAR, '')
-        home_name = find_name_from_nickname(home_team)
-        home_rank = re.findall('\(\d+\)', ranks[HOME])
-        if len(home_rank) > 0:
-            home_name = '%s %s' % (home_rank[0], home_name)
+        home_name = teams[HOME].get_text().strip()
+        rank = team_ranked(home_team)
+        if rank:
+            home_name = '(%s) %s' % (rank, home_name)
             top_25 = True
     except IndexError:
         return None, None, None, None, None
     return away_team, home_team, away_name, home_name, top_25
+
+
+def find_game_time(game_table):
+    time = re.findall('\d+:\d+ [A|P]M', str(game_table))
+    return time[0]
 
 
 def save_predictions(predictions):
@@ -102,7 +106,8 @@ def extract_stats_components(stats, away=False):
 
 
 def create_prediction_data(home_name, home_nickname, away_name, away_nickname,
-                           top_25, winner, loser, inverted_conferences):
+                           top_25, winner, loser, inverted_conferences,
+                           game_time):
     tags = []
     if top_25:
         tags = ['Top 25']
@@ -110,7 +115,7 @@ def create_prediction_data(home_name, home_nickname, away_name, away_nickname,
     tags.append(inverted_conferences[away_nickname])
     tags = list(set(tags))
     prediction = [tags, home_name, home_nickname, away_name, away_nickname,
-                  winner, loser]
+                  winner, loser, game_time]
     return prediction
 
 
@@ -134,10 +139,13 @@ def parse_boxscores(boxscore_html, predictor):
     t_25_predictions = pd.DataFrame()
     inverted_conferences = invert_conference_dict()
 
-    games_table = boxscore_html.find('div', {'class': 'game_summaries'})
-    games = games_table.find_all('tbody')
+    games_table = boxscore_html.find('div', {'class': '', 'id': 'games'})
+    # The value at index 0 corresponds to today's games
+    games_table = games_table.find_all('div')[0]
+    games = games_table.find_all('span')
     for game in games:
         away, home, away_name, home_name, top_25 = extract_teams_from_game(game)
+        game_time = find_game_time(game)
         if away is None or home is None:
             # Occurs when a DI school plays a non-DI school
             # The parser does not save stats for non-DI schools
@@ -151,12 +159,14 @@ def parse_boxscores(boxscore_html, predictor):
             t_25_games_list.append(['%s at %s' % (away_name, home_name),
                                    [home_name, away_name]])
             t_25_predictions = t_25_predictions.append(match_stats)
-            t_25_match_info.append([home_name, home, away_name, away, top_25])
+            t_25_match_info.append([home_name, home, away_name, away, top_25,
+                                    game_time])
         else:
             games_list.append(['%s at %s' % (away_name, home_name),
                               [home_name, away_name]])
             prediction_stats = prediction_stats.append(match_stats)
-            match_info.append([home_name, home, away_name, away, top_25])
+            match_info.append([home_name, home, away_name, away, top_25,
+                               game_time])
 
     t_25_data = [t_25_predictions, t_25_games_list, 'Top 25 Games',
                  t_25_match_info]
@@ -179,10 +189,11 @@ def parse_boxscores(boxscore_html, predictor):
             winner = games_list[i][1][predictions[i]]
             loser = games_list[i][1][abs(predictions[i]-1)]
             display_prediction(games_list[i][0], winner)
-            home, home_nickname, away, away_nickname, top_25 = match_info[i]
+            home, home_nickname, away, away_nickname, top_25, game_time = \
+                match_info[i]
             p = create_prediction_data(home, home_nickname, away, away_nickname,
                                        top_25, winner, loser,
-                                       inverted_conferences)
+                                       inverted_conferences, game_time)
             prediction_list.append(p)
             games_parsed += 1
     print '=' * 80
@@ -194,8 +205,7 @@ def parse_boxscores(boxscore_html, predictor):
 
 
 def find_todays_games(predictor):
-    url = retrieve_todays_url()
-    boxscores = requests.get(url)
+    boxscores = requests.get(HOME_PAGE)
     boxscore_html = BeautifulSoup(boxscores.text, 'lxml')
     parse_boxscores(boxscore_html, predictor)
 
