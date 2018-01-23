@@ -172,6 +172,32 @@ def differential_vector(stats):
     return stats
 
 
+def convert_team_totals_to_averages(stats):
+    fields_to_average = ['mp', 'fg', 'fga', 'fg2', 'fg2a', 'fg3', 'fg3a', 'ft',
+                         'fta', 'orb', 'drb', 'trb', 'ast', 'stl', 'blk', 'tov',
+                         'pf', 'pts']
+    num_games = stats['g']
+    new_stats = stats.copy()
+
+    for field in fields_to_average:
+        new_value = float(stats[field]) / num_games
+        new_stats.loc[:,field] = new_value
+    return new_stats
+
+
+def extract_stats_components(stats, away=False):
+    # Get all of the stats that don't start with 'opp', AKA all of the
+    # stats that are directly related to the indicated team.
+    filtered_columns = [col for col in stats if not str(col).startswith('opp')]
+    stats = stats[filtered_columns]
+    stats = convert_team_totals_to_averages(stats)
+    if away:
+        # Prepend all stats with 'opp_' to signify the away team as such.
+        away_columns = ['opp_%s' % col for col in stats]
+        stats.columns = away_columns
+    return stats
+
+
 def find_name_from_nickname(nickname):
     from teams import TEAMS
 

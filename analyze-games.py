@@ -6,7 +6,9 @@ import random
 import re
 import requests
 from bs4 import BeautifulSoup
-from common import (differential_vector,
+from common import (convert_team_totals_to_averages,
+                    differential_vector,
+                    extract_stats_components,
                     read_team_stats_file)
 from conferences import CONFERENCES
 from constants import YEAR
