@@ -55,6 +55,7 @@ def save_result(saved_data, winner, loser):
                                                    'loser': loser,
                                                    'correct': correct}
             return saved_data, correct
+    return saved_data, None
 
 
 def parse_boxscore(boxscore, saved_data):
