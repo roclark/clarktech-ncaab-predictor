@@ -1,26 +1,36 @@
 import argparse
 import json
-import numpy
 import os
 import pandas as pd
 import re
 import requests
 from bs4 import BeautifulSoup
 from common import (differential_vector,
-                    find_name_from_nickname,
                     read_team_stats_file)
 from conferences import CONFERENCES
 from constants import YEAR
 from datetime import datetime
 from predictor import Predictor
 from save_json import save_predictions_json
-from teams import TEAMS
 
 
 AWAY = 0
 HOME = 1
 TEAM_NAME_REGEX = 'schools/.*?/%s.html' % YEAR
 HOME_PAGE = 'http://www.sports-reference.com/cbb/'
+FIELDS_TO_RENAME = {'win_loss_pct': 'win_pct'}
+
+
+class MatchInfo:
+    def __init__(self, away, home, away_nickname, home_nickname, top_25,
+                 game_time, match_stats):
+        self.away = away
+        self.away_nickname = away_nickname
+        self.game_time = game_time
+        self.home = home
+        self.home_nickname = home_nickname
+        self.match_stats = match_stats
+        self.top_25 = top_25
 
 
 def team_ranked(team):
@@ -31,31 +41,28 @@ def team_ranked(team):
         return None
 
 
+def extract_team(team_link, top_25=False):
+    try:
+        team = re.findall(TEAM_NAME_REGEX, str(team_link))[0]
+        team = team.replace('schools/', '')
+        team = team.replace('/%s.html' % YEAR, '')
+        name = team_link.get_text().strip()
+        rank = team_ranked(team)
+        if rank:
+            name = '(%s) %s' % (rank, name)
+            top_25 = True
+        return team, name, top_25
+    except IndexError:
+        return None, None, None
+
+
 def extract_teams_from_game(game_table):
     top_25 = False
 
     teams = game_table.find_all('a')
-    try:
-        away_team = re.findall(TEAM_NAME_REGEX, str(teams[AWAY]))[0]
-        away_team = away_team.replace('schools/', '')
-        away_team = away_team.replace('/%s.html' % YEAR, '')
-        away_name = teams[AWAY].get_text().strip()
-        rank = team_ranked(away_team)
-        if rank:
-            away_name = '(%s) %s' % (rank, away_name)
-            top_25 = True
-    except IndexError:
-        return None, None, None, None, None
-    try:
-        home_team = re.findall(TEAM_NAME_REGEX, str(teams[HOME]))[0]
-        home_team = home_team.replace('schools/', '')
-        home_team = home_team.replace('/%s.html' % YEAR, '')
-        home_name = teams[HOME].get_text().strip()
-        rank = team_ranked(home_team)
-        if rank:
-            home_name = '(%s) %s' % (rank, home_name)
-            top_25 = True
-    except IndexError:
+    away_team, away_name, top_25 = extract_team(teams[AWAY])
+    home_team, home_name, top_25 = extract_team(teams[HOME], top_25)
+    if not away_team or not home_team:
         return None, None, None, None, None
     return away_team, home_team, away_name, home_name, top_25
 
@@ -105,17 +112,16 @@ def extract_stats_components(stats, away=False):
     return stats
 
 
-def create_prediction_data(home_name, home_nickname, away_name, away_nickname,
-                           top_25, winner, loser, inverted_conferences,
-                           game_time):
+def create_prediction_data(match_data, inverted_conferences, winner, loser):
     tags = []
-    if top_25:
+    if match_data.top_25:
         tags = ['Top 25']
-    tags.append(inverted_conferences[home_nickname])
-    tags.append(inverted_conferences[away_nickname])
+    tags.append(inverted_conferences[match_data.home])
+    tags.append(inverted_conferences[match_data.away])
     tags = list(set(tags))
-    prediction = [tags, home_name, home_nickname, away_name, away_nickname,
-                  winner, loser, game_time]
+    prediction = [tags, match_data.home_nickname, match_data.home,
+                  match_data.away_nickname, match_data.away, winner,
+                  loser, match_data.game_time]
     return prediction
 
 
@@ -128,80 +134,65 @@ def invert_conference_dict():
     return new_dict
 
 
+def get_stats(stats_filename, away=False):
+    stats = read_team_stats_file(stats_filename)
+    return extract_stats_components(stats, away)
+
+
+def get_game_information(game):
+    away, home, away_name, home_name, top_25 = extract_teams_from_game(game)
+    # Occurs when a DI school plays a non-DI school
+    # The parser does not save stats for non-DI schools
+    if away is None or home is None:
+        return None
+    game_time = find_game_time(game)
+    away_stats = get_stats('team-stats/%s' % away, away=True)
+    home_stats = get_stats('team-stats/%s' % home, away=False)
+    match_stats = pd.concat([away_stats, home_stats], axis=1)
+    m = MatchInfo(away, home, away_name, home_name, top_25, game_time,
+                  match_stats)
+    return m
+
+
+def make_predictions(prediction_stats, games_list, match_info, predictor):
+    prediction_list = []
+    inverted_conferences = invert_conference_dict()
+
+    prediction_data = pd.concat(prediction_stats)
+    prediction_data = differential_vector(prediction_data)
+    prediction_data.rename(columns=FIELDS_TO_RENAME, inplace=True)
+    prediction_data = predictor.simplify(prediction_data)
+    predictions = predictor.predict(prediction_data, int)
+    for i in range(0, len(games_list)):
+        winner = games_list[i][1][predictions[i]]
+        loser = games_list[i][1][abs(predictions[i]-1)]
+        display_prediction(games_list[i][0], winner)
+        p = create_prediction_data(match_info[i], inverted_conferences, winner,
+                                   loser)
+        prediction_list.append(p)
+    return prediction_list
+
+
 def parse_boxscores(boxscore_html, predictor):
     games_list = []
-    prediction_list = []
-    t_25_games_list = []
     match_info = []
-    t_25_match_info = []
-    fields_to_rename = {'win_loss_pct': 'win_pct'}
-    prediction_stats = pd.DataFrame()
-    t_25_predictions = pd.DataFrame()
-    inverted_conferences = invert_conference_dict()
+    prediction_stats = []
 
     games_table = boxscore_html.find('div', {'class': '', 'id': 'games'})
     # The value at index 0 corresponds to today's games
     games_table = games_table.find_all('div')[0]
     games = games_table.find_all('span')
     for game in games:
-        away, home, away_name, home_name, top_25 = extract_teams_from_game(game)
-        game_time = find_game_time(game)
-        if away is None or home is None:
-            # Occurs when a DI school plays a non-DI school
-            # The parser does not save stats for non-DI schools
+        g = get_game_information(game)
+        if not g:
             continue
-        away_stats = read_team_stats_file('team-stats/%s' % away)
-        home_stats = read_team_stats_file('team-stats/%s' % home)
-        away_filter = extract_stats_components(away_stats, away=True)
-        home_filter = extract_stats_components(home_stats, away=False)
-        match_stats = pd.concat([away_filter, home_filter], axis=1)
-        if top_25:
-            t_25_games_list.append(['%s at %s' % (away_name, home_name),
-                                   [home_name, away_name]])
-            t_25_predictions = t_25_predictions.append(match_stats)
-            t_25_match_info.append([home_name, home, away_name, away, top_25,
-                                    game_time])
-        else:
-            games_list.append(['%s at %s' % (away_name, home_name),
-                              [home_name, away_name]])
-            prediction_stats = prediction_stats.append(match_stats)
-            match_info.append([home_name, home, away_name, away, top_25,
-                               game_time])
-
-    t_25_data = [t_25_predictions, t_25_games_list, 'Top 25 Games',
-                 t_25_match_info]
-    d1_data = [prediction_stats, games_list, 'NCAA Division-I Games',
-               match_info]
-    games_parsed = 0
-    for dataset in [t_25_data, d1_data]:
-        prediction_stats, games_list, heading, match_info = dataset
-        if len(games_list) == 0:
-            continue
-        print '=' * 80
-        print '  %s' % heading
-        print '=' * 80
-        differential_stats_vector = differential_vector(prediction_stats)
-        differential_stats_vector.rename(columns=fields_to_rename, inplace=True)
-        match_stats_simplified = predictor.simplify(differential_stats_vector)
-        predictions = predictor.predict(match_stats_simplified, int)
-        probabilities = predictor.predict_probability(match_stats_simplified)
-        for i in range(0, len(games_list)):
-            winner = games_list[i][1][predictions[i]]
-            loser = games_list[i][1][abs(predictions[i]-1)]
-            display_prediction(games_list[i][0], winner)
-            home, home_nickname, away, away_nickname, top_25, game_time = \
-                match_info[i]
-            p = create_prediction_data(home, home_nickname, away, away_nickname,
-                                       top_25, winner, loser,
-                                       inverted_conferences, game_time)
-            prediction_list.append(p)
-            games_parsed += 1
-    print '=' * 80
-    if games_parsed == 0:
-        print '  No games scheduled for today'
-        print '=' * 80
-        return
-    save_predictions(prediction_list)
+        games_list.append(['%s at %s' % (g.away_nickname, g.home_nickname),
+                          [g.home_nickname, g.away_nickname]])
+        prediction_stats.append(g.match_stats)
+        match_info.append(g)
+    predictions = make_predictions(prediction_stats, games_list, match_info,
+                                   predictor)
+    save_predictions(predictions)
 
 
 def find_todays_games(predictor):
