@@ -2,6 +2,7 @@ import argparse
 import json
 import os
 import pandas as pd
+import random
 import re
 import requests
 from bs4 import BeautifulSoup
@@ -12,10 +13,12 @@ from constants import YEAR
 from datetime import datetime
 from predictor import Predictor
 from save_json import save_predictions_json
+from teams import TEAMS
 
 
 AWAY = 0
 HOME = 1
+NUM_SIMS = 100
 TEAM_NAME_REGEX = 'schools/.*?/%s.html' % YEAR
 HOME_PAGE = 'http://www.sports-reference.com/cbb/'
 FIELDS_TO_RENAME = {'win_loss_pct': 'win_pct'}
@@ -134,24 +137,44 @@ def invert_conference_dict():
     return new_dict
 
 
-def get_stats(stats_filename, away=False):
+def create_variance(stats, stdev_dict):
+    local_stats = {}
+
+    for stat in stats:
+        min_val = -1 * float(stdev_dict[stat])
+        max_val = abs(min_val)
+        variance = random.uniform(min_val, max_val)
+        new_value = float(stats[stat]) + variance
+        local_stats[stat] = new_value
+    return pd.DataFrame([local_stats])
+
+
+def get_stats(stats_filename, stdev_dict, away=False):
     stats = read_team_stats_file(stats_filename)
+    if stdev_dict:
+        stats = create_variance(stats, stdev_dict)
     return extract_stats_components(stats, away)
 
 
-def get_game_information(game):
+def get_game_information(game, stdev_dict):
     away, home, away_name, home_name, top_25 = extract_teams_from_game(game)
     # Occurs when a DI school plays a non-DI school
     # The parser does not save stats for non-DI schools
     if away is None or home is None:
         return None
     game_time = find_game_time(game)
-    away_stats = get_stats('team-stats/%s' % away, away=True)
-    home_stats = get_stats('team-stats/%s' % home, away=False)
+    away_stats = get_stats('team-stats/%s' % away, stdev_dict, away=True)
+    home_stats = get_stats('team-stats/%s' % home, stdev_dict, away=False)
     match_stats = pd.concat([away_stats, home_stats], axis=1)
     m = MatchInfo(away, home, away_name, home_name, top_25, game_time,
                   match_stats)
     return m
+
+
+def get_winner(probability):
+    winner = max(probability, key=probability.get)
+    loser = min(probability, key=probability.get)
+    return winner, loser
 
 
 def make_predictions(prediction_stats, games_list, match_info, predictor):
@@ -163,14 +186,41 @@ def make_predictions(prediction_stats, games_list, match_info, predictor):
     prediction_data.rename(columns=FIELDS_TO_RENAME, inplace=True)
     prediction_data = predictor.simplify(prediction_data)
     predictions = predictor.predict(prediction_data, int)
-    for i in range(0, len(games_list)):
-        winner = games_list[i][1][predictions[i]]
-        loser = games_list[i][1][abs(predictions[i]-1)]
-        display_prediction(games_list[i][0], winner)
-        p = create_prediction_data(match_info[i], inverted_conferences, winner,
-                                   loser)
+    probabilities = predictor.predict_probability(prediction_data)
+    for sim in range(len(games_list) / NUM_SIMS):
+        total_probability = {}
+        for i in range(NUM_SIMS):
+            x = sim * NUM_SIMS + i
+            winner = games_list[x][1][predictions[x]]
+            loser = games_list[x][1][abs(predictions[x]-1)]
+            winner_prob = probabilities[x][predictions[x]]
+            loser_prob = probabilities[x][abs(predictions[x]-1)]
+            try:
+                total_probability[winner] += winner_prob
+            except KeyError:
+                total_probability[winner] = winner_prob
+            try:
+                total_probability[loser] += loser_prob
+            except KeyError:
+                total_probability[loser] = loser_prob
+        winner, loser = get_winner(total_probability)
+        display_prediction(games_list[sim*NUM_SIMS][0], winner)
+        p = create_prediction_data(match_info[sim*NUM_SIMS],
+                                   inverted_conferences, winner, loser)
         prediction_list.append(p)
     return prediction_list
+
+
+def find_stdev_for_every_stat():
+    stats_list = []
+    stdev_dict = {}
+
+    for team in TEAMS.values():
+        stats_list.append(get_stats('team-stats/%s' % team, None))
+    stats_dataframe = pd.concat(stats_list)
+    for col in stats_dataframe:
+        stdev_dict[col] = stats_dataframe[col].std()
+    return stdev_dict
 
 
 def parse_boxscores(boxscore_html, predictor):
@@ -178,18 +228,20 @@ def parse_boxscores(boxscore_html, predictor):
     match_info = []
     prediction_stats = []
 
+    stdev_dict = find_stdev_for_every_stat()
     games_table = boxscore_html.find('div', {'class': '', 'id': 'games'})
     # The value at index 0 corresponds to today's games
     games_table = games_table.find_all('div')[0]
     games = games_table.find_all('span')
     for game in games:
-        g = get_game_information(game)
-        if not g:
-            continue
-        games_list.append(['%s at %s' % (g.away_nickname, g.home_nickname),
-                          [g.home_nickname, g.away_nickname]])
-        prediction_stats.append(g.match_stats)
-        match_info.append(g)
+        for sim in range(NUM_SIMS):
+            g = get_game_information(game, stdev_dict)
+            if not g:
+                continue
+            games_list.append(['%s at %s' % (g.away_nickname, g.home_nickname),
+                              [g.home_nickname, g.away_nickname]])
+            prediction_stats.append(g.match_stats)
+            match_info.append(g)
     predictions = make_predictions(prediction_stats, games_list, match_info,
                                    predictor)
     save_predictions(predictions)
