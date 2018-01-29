@@ -164,10 +164,9 @@ def predict_all_simulations(predictor, stats_dict, stdev_dict, conference,
                                         schedule, conference_wins)
         points_dict = add_points_total(points_dict, team_wins)
         rankings = print_rankings(team_wins)
-        i = 0
-        for team in rankings:
-            standings_dict[team][i] = standings_dict[team][i] + 1
-            i += 1
+        for rank in range(len(rankings)):
+            for team in rankings[rank]:
+                standings_dict[team][rank] = standings_dict[team][rank] + 1
     print_simulation_results(standings_dict, num_sims)
     return standings_dict, points_dict
 
@@ -236,16 +235,19 @@ def create_stats_dictionary(conference):
 
 
 def print_rankings(team_wins):
-    i = 1
-
+    rankings = [[] for i in range(len(team_wins))]
     sorted_ranks = [(v,k) for k,v in team_wins.iteritems()]
     sorted_ranks.sort(reverse=True)
-    rankings = []
-    for wins, team in sorted_ranks:
+    rank = 1
+    previous_wins = None
+    for i in range(len(sorted_ranks)):
+        wins, team = sorted_ranks[i]
         team = find_name_from_nickname(team)
-        print '%s. %s: %s' % (str(i).rjust(3), team, wins)
-        rankings.append(team)
-        i += 1
+        if previous_wins != wins:
+            rank = i + 1
+        print '%s. %s: %s (rank %s)' % (str(i+1).rjust(3), team, wins, rank)
+        previous_wins = wins
+        rankings[rank-1].append(team)
     return rankings
 
 
