@@ -63,8 +63,11 @@ def extract_teams_from_game(game_table):
     top_25 = False
 
     teams = game_table.find_all('a')
-    away_team, away_name, top_25 = extract_team(teams[AWAY])
-    home_team, home_name, top_25 = extract_team(teams[HOME], top_25)
+    try:
+        away_team, away_name, top_25 = extract_team(teams[AWAY])
+        home_team, home_name, top_25 = extract_team(teams[HOME], top_25)
+    except IndexError:
+        return None, None, None, None, None
     if not away_team or not home_team:
         return None, None, None, None, None
     return away_team, home_team, away_name, home_name, top_25
