@@ -12,6 +12,14 @@ from requests import Session
 CONFERENCE_PAGE = 'https://www.sports-reference.com/cbb/seasons/%s.html'
 RANKINGS_PAGE = 'https://www.sports-reference.com/cbb/seasons/%s-polls.html'
 STATS_PAGE = 'http://www.sports-reference.com/cbb/seasons/%s-school-stats.html'
+ADV_STATS_PAGE = 'http://www.sports-reference.com/cbb/seasons/%s-advanced-school-stats.html'
+RATINGS_PAGE = 'http://www.sports-reference.com/cbb/seasons/%s-ratings.html'
+
+# These stats are already included with the basic stats and should be skipped
+FILTER_ADVANCED_STATS = ['g', 'wins', 'losses', 'win_loss_pct', 'srs', 'sos',
+                         'wins_conf', 'losses_conf', 'wins_home', 'losses_home',
+                         'wins_visitor', 'losses_visitor', 'pts', 'opp_pts',
+                         'x']
 
 
 def parse_name(href):
@@ -32,15 +40,38 @@ def add_categories(stats):
     return stats
 
 
-def parse_stats_page(stats_page, rankings, conferences, power_conf_teams):
+def parse_advanced_stats(stats_html):
+    all_stats = {}
+
+    for team in stats_html.find_all('tr', class_='')[1:]:
+        name = None
+        stats = {}
+        for stat in team.find_all('td'):
+            if str(dict(stat.attrs).get('data-stat')) == 'school_name':
+                name = parse_name(str(stat.a['href']))
+                continue
+            field = str(dict(stat.attrs).get('data-stat'))
+            if field in FILTER_ADVANCED_STATS:
+                continue
+            value = float(stat.get_text())
+            stats[field] = value
+        all_stats[name] = stats
+    return all_stats
+
+
+def parse_stats_page(stats_page, advanced_stats, rankings, conferences,
+                     power_conf_teams, ratings):
     sos_list = []
     teams_list = []
 
     stats_html = BeautifulSoup(stats_page.text, 'lxml')
+    adv_stats_html = BeautifulSoup(advanced_stats.text, 'lxml')
     sos_tags = stats_html.find_all('td', attrs={'data-stat': 'sos'})
     sos_tags = [float(tag.get_text()) for tag in sos_tags]
     min_sos = min(sos_tags)
     max_sos = max(sos_tags)
+
+    advanced = parse_advanced_stats(adv_stats_html)
 
     # The first row just describes the stats. Skip it as it is irrelevant.
     team_stats = stats_html.find_all('tr', class_='')[1:]
@@ -70,6 +101,13 @@ def parse_stats_page(stats_page, rankings, conferences, power_conf_teams):
             rank = rankings[nickname]
         except KeyError:
             rank = '-'
+        # Combine the basic and advanced stats plus the ratings into
+        # one dictionary
+        temp = advanced[nickname].copy()
+        temp.update(stats)
+        temp.update(ratings[nickname])
+        stats = temp
+
         stats = add_categories(stats)
         stats = include_team_rank(stats, rank)
         stats = weighted_sos(stats, float(sos), stats['win_loss_pct'], max_sos,
@@ -81,8 +119,8 @@ def parse_stats_page(stats_page, rankings, conferences, power_conf_teams):
     return sos_list, max_sos, min_sos
 
 
-def get_stats_page(session):
-    stats_page = make_request(session, STATS_PAGE % YEAR)
+def get_stats_page(session, page):
+    stats_page = make_request(session, page % YEAR)
     return stats_page
 
 
@@ -154,6 +192,26 @@ def get_rankings(session):
     return rankings_dict
 
 
+def get_ratings(session):
+    ratings_page = make_request(session, RATINGS_PAGE % YEAR)
+    ratings_html = BeautifulSoup(ratings_page.text, 'lxml')
+    ratings = {}
+    for row in ratings_html.body.find_all('tr'):
+        if not row.find('td'):
+            continue
+        ortg = float(row.find('td', {'data-stat': 'off_rtg'}).get_text())
+        drtg = float(row.find('td', {'data-stat': 'def_rtg'}).get_text())
+        nrtg = float(row.find('td', {'data-stat': 'net_rtg'}).get_text())
+        name = row.find('td', {'data-stat': 'school_name'}).a['href']
+        name = parse_name(name)
+        ratings[name] = {
+            'off_rtg': ortg,
+            'def_rtg': drtg,
+            'net_rtg': nrtg
+        }
+    return ratings
+
+
 def get_conference_teams(session, conference_uri):
     teams = []
 
@@ -198,12 +256,15 @@ def main():
 
     conferences, power_conf_teams = get_conferences(session)
     rankings = get_rankings(session)
-    stats_page = get_stats_page(session)
+    ratings = get_ratings(session)
+    stats_page = get_stats_page(session, STATS_PAGE)
+    advanced_stats = get_stats_page(session, ADV_STATS_PAGE)
     if not stats_page:
         print 'Error retrieving stats page'
         return None
-    sos_list, max_sos, min_sos = parse_stats_page(stats_page, rankings,
-                                                  conferences, power_conf_teams)
+    sos_list, max_sos, min_sos = parse_stats_page(stats_page, advanced_stats,
+                                                  rankings, conferences,
+                                                  power_conf_teams, ratings)
     save_sos_list(sos_list, max_sos, min_sos)
     save_conferences(conferences)
 
