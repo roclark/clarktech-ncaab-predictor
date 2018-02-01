@@ -8,6 +8,7 @@ from conferences import CONFERENCES
 from common import differential_vector, find_name_from_nickname
 from constants import YEAR
 from datetime import datetime
+from math import ceil, sqrt
 from predictor import Predictor
 from teams import TEAMS
 
@@ -64,7 +65,8 @@ def teams_list(conference):
     return teams
 
 
-def split_datasets(dataset, set_size):
+def split_datasets(dataset):
+    set_size = int(ceil(sqrt(len(dataset))))
     for i in xrange(0, len(dataset), set_size):
         yield dataset[i:i+set_size]
 
@@ -77,55 +79,83 @@ def initialize_team_wins(teams):
     return team_wins
 
 
-def predict_all_matches(predictor, stats_dict, teams):
+def update_rankings(rankings, team_wins):
+    sorted_ranks = [(v,k) for k,v in team_wins.iteritems() if v > 0]
+    sorted_ranks.sort(reverse=True)
+    for value, team in sorted_ranks:
+        if team not in rankings:
+            rankings.append(team)
+    return rankings
+
+
+def predict_all_matches(predictor, stats_dict, net_ratings, teams):
     fields_to_rename = {'win_loss_pct': 'win_pct',
                         'opp_win_loss_pct': 'opp_win_pct'}
     team_wins = initialize_team_wins(teams)
+    rankings = []
 
-    for dataset in split_datasets(teams, 75):
+    for dataset in split_datasets(net_ratings):
         games_list = []
         prediction_stats = pd.DataFrame()
         match_stats = []
         for home_team in dataset:
             team_wins[home_team] = 0
             print home_team
-            for away_team in teams:
+            for away_team in dataset:
                 if home_team == away_team:
                     continue
                 home_stats = stats_dict[home_team]
                 away_stats = stats_dict['%s_away' % away_team]
                 match_stats.append(pd.concat([away_stats, home_stats], axis=1))
                 games_list.append([home_team, away_team])
-        prediction_stats = pd.concat(match_stats)
+        try:
+            prediction_stats = pd.concat(match_stats)
+        # Occurs when only one team is left in a pool. For example, if the teams
+        # are divided into approximately 10 groups, there will be a single team
+        # leftover which will automatically be the lowest-tier team, so add them
+        # to the end of the rankings.
+        except ValueError:
+            rankings.append(home_team)
+            continue
         match_vector = differential_vector(prediction_stats)
         match_vector.rename(columns=fields_to_rename, inplace=True)
         match_stats_simplified = predictor.simplify(match_vector)
         predictions = predictor.predict(match_stats_simplified, int)
         probabilities = predictor.predict_probability(match_stats_simplified)
-        team_wins = get_totals(games_list, predictions, team_wins)
-    return team_wins
+        team_wins = get_totals(games_list, predictions, team_wins,
+                               probabilities)
+        rankings = update_rankings(rankings, team_wins)
+    return rankings
 
 
 def create_stats_dictionary(teams):
     stats_dict = {}
+    net_rankings = {}
 
     for team in teams:
         stats = read_team_stats_file('team-stats/%s' % team)
         home_stats = extract_stats_components(stats)
+        net_rankings[team] = float(home_stats.net_rtg)
         away_stats = extract_stats_components(stats, away=True)
         stats_dict[team] = home_stats
         stats_dict['%s_away' % team] = away_stats
-    return stats_dict
+    return stats_dict, net_rankings
 
 
-def print_rankings(team_wins):
+def sort_by_net_rating(net_rankings):
+    sorted_ranks = []
+    for key, value in sorted(net_rankings.iteritems(), key=lambda (k,v): (v,k),
+                             reverse=True):
+        sorted_ranks.append(key)
+    return sorted_ranks
+
+
+def print_rankings(rankings):
     i = 1
 
-    sorted_ranks = [(v,k) for k,v in team_wins.iteritems()]
-    sorted_ranks.sort(reverse=True)
-    for wins, team in sorted_ranks:
+    for team in rankings:
         team = find_name_from_nickname(team)
-        print '%s. %s: %s' % (str(i).rjust(3), team, wins)
+        print '%s. %s' % (str(i).rjust(3), team)
         i += 1
 
 
@@ -142,9 +172,11 @@ def main():
     args = parse_arguments()
     predictor = Predictor()
     teams = teams_list(args.conference)
-    stats_dict = create_stats_dictionary(teams)
-    team_wins = predict_all_matches(predictor, stats_dict, teams)
-    print_rankings(team_wins)
+    stats_dict, net_rankings = create_stats_dictionary(teams)
+    sorted_net_rating = sort_by_net_rating(net_rankings)
+    rankings = predict_all_matches(predictor, stats_dict, sorted_net_rating,
+                                   teams)
+    print_rankings(rankings)
 
 
 if __name__ == "__main__":
