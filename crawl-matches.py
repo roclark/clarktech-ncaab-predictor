@@ -16,17 +16,25 @@ BOXSCORES = 'http://www.sports-reference.com/cbb/boxscores/'
 SCHEDULE = 'http://www.sports-reference.com/cbb/schools/%s/%s-schedule.html'
 
 
-def create_stats_dict(stats_dict, totals, away=False):
-    for tag in totals.find_all('td'):
-        field = str(dict(tag.attrs).get('data-stat'))
-        if away:
-            field = 'opp_%s' % field
-        try:
-            value = float(tag.get_text())
-        except ValueError:
-            # Sometimes, there is no value, such as when a team doesn't attempt
-            # a free throw. In that case, default to 0.
-            value = 0
+def get_field_and_value(tag, away=False):
+    field = str(dict(tag.attrs).get('data-stat'))
+    if away:
+        field = 'opp_%s' % field
+    try:
+        value = float(tag.get_text())
+    except ValueError:
+        # Sometimes, there is no value, such as when a team doesn't attempt a
+        # free throw. In that case, default to 0.
+        value = 0
+    return field, value
+
+
+def create_stats_dict(stats_dict, totals, adv_totals, away=False):
+    for tag in BeautifulSoup(totals, 'lxml').find_all('td'):
+        field, value = get_field_and_value(tag, away)
+        stats_dict[field] = value
+    for tag in BeautifulSoup(adv_totals, 'lxml').find_all('td'):
+        field, value = get_field_and_value(tag, away)
         stats_dict[field] = value
     return stats_dict
 
@@ -136,16 +144,18 @@ def get_match_data(session, matches):
         winner = check_if_home_team_won(match_soup.find_all('div',
                                                             {'class': 'score'}
                                                            ))
-        team_totals = match_soup.find_all('tfoot')
+        team_totals = re.findall('<tfoot>.*?</tfoot>', str(match_soup),
+                                 re.DOTALL)
         # Sometimes, sports-reference makes a mistake and doesn't sum the totals
         # in the bottom of the stats tables. Instead of calculating them, and
         # dramatically increasing the complexity of the parser, just skip the
         # game as the sample size is large enough for a game or two to be
         # largely insignificant.
-        if len(team_totals) < 2:
+        if len(team_totals) < 4:
             continue
-        stats = create_stats_dict({}, team_totals[0])
-        stats = create_stats_dict(stats, team_totals[1], away=True)
+        stats = create_stats_dict({}, team_totals[0], team_totals[1])
+        stats = create_stats_dict(stats, team_totals[2], team_totals[3],
+                                  away=True)
         home_rank, away_rank = check_if_team_ranked(
             match_soup.find_all('div', class_='game_summary nohover current')[0]
         )

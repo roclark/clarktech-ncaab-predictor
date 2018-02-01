@@ -35,7 +35,23 @@ FIELDS_TO_COMBINE = {
     'drb': 'opp_drb',
     'fg2_pct': 'opp_fg2_pct',
     'ranked': 'opp_ranked',
-    'win_loss_pct': 'opp_win_loss_pct'
+    'win_loss_pct': 'opp_win_loss_pct',
+    'pace': 'opp_pace',
+    'off_rtg': 'opp_off_rtg',
+    'def_rtg': 'opp_def_rtg',
+    'net_rtg': 'opp_net_rtg',
+    'ftr': 'opp_ftr',
+    'fg3a_per_fga_pct': 'opp_fg3a_per_fga_pct',
+    'fta_per_fga_pct': 'opp_fta_per_fga_pct',
+    'ft_rate': 'opp_ft_rate',
+    'ts_pct': 'opp_ts_pct',
+    'trb_pct': 'opp_trb_pct',
+    'ast_pct': 'opp_ast_pct',
+    'stl_pct': 'opp_stl_pct',
+    'blk_pct': 'opp_blk_pct',
+    'efg_pct': 'opp_efg_pct',
+    'tov_pct': 'opp_tov_pct',
+    'orb_pct': 'opp_orb_pct'
 }
 
 
