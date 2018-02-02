@@ -17,6 +17,7 @@ from math import ceil, sqrt
 from operator import itemgetter
 from os import path, makedirs
 from predictor import Predictor
+from pymongo import MongoClient
 from save_json import save_predictions_json, save_simulation
 from sportsreference.constants import AWAY, REGULAR_SEASON
 from sportsreference.ncaab.boxscore import Boxscores
@@ -27,12 +28,18 @@ from sportsreference.ncaab.teams import Teams
 
 CONFERENCE_TOURNAMENT = 'conference-tourney-simulator'
 DAILY_SIMULATION = 'daily-simulation'
+FILL_NCAA_FIELD = 'fill-ncaa-field'
 MATCHUP = 'matchup'
 MONTE_CARLO_SIMULATION = 'monte-carlo-simulation'
 POWER_RANKINGS = 'power-rankings'
 TOURNAMENT_SIMULATOR = 'tournament-simulator'
 
 NUM_SIMS = 100
+
+# These seeds have a different number of teams due to the play-in games.
+# All other seeds have 4 teams.
+DIFFERENT_NUM_SEEDS = {11: 6, 16: 6}
+REGULAR_NUM_SEEDS = 4
 
 
 class MatchInfo:
@@ -343,6 +350,9 @@ def update_rankings(rankings, team_mov, dataset):
 
 
 def save_rankings(mongo_url, rankings, skip_mongo):
+    with open('rankings.txt', 'w') as rankings_file:
+        for team in rankings:
+            rankings_file.write('%s\n' % team)
     if skip_mongo:
         return
     overall_rankings = []
@@ -455,6 +465,89 @@ def simulate_conference_tournament(predictor, seeds, bracket, teams, rankings,
     return winner
 
 
+def automatic_bids(predictor, teams, rankings, num_sims):
+    # Get all of the automatic bid teams who won their conference tournament.
+    # This might not necessarily be the first-placed team in the conference.
+    auto_bids = start_conference_tournament_simulator(predictor, teams,
+                                                      rankings, num_sims)
+    return list(auto_bids.values())
+
+
+def populate_field(auto_bids, power_rankings):
+    field = []
+    rankings_index = 0
+
+    while len(field) < 68:
+        # First load all of the auto-bid teams into the field.
+        if len(auto_bids) > 0:
+            field.append(auto_bids.pop())
+            continue
+        # Next, load the at-large bids into the field based on their rankings.
+        # If the next team isn't in the field already, add them and continue.
+        # If a team is already in the field, keep increasing the rankings_index
+        # until a team that isn't already in the field is found.
+        while True:
+            if power_rankings[rankings_index] in field:
+                rankings_index += 1
+                continue
+            field.append(power_rankings[rankings_index])
+            break
+        rankings_index += 1
+    return field
+
+
+def load_rankings():
+    with open('rankings.txt', 'r') as rankings_file:
+        rankings = rankings_file.read().split('\n')
+    return rankings
+
+
+def sort_field(field, power_rankings):
+    ranks = {}
+
+    for team in field:
+        rank = power_rankings.index(team)
+        ranks[team] = rank
+    return [team for team in sorted(ranks, key=ranks.get)]
+
+
+def slot_open(seed, filled_slots):
+    num_slots = REGULAR_NUM_SEEDS
+
+    if seed in DIFFERENT_NUM_SEEDS:
+        num_slots = DIFFERENT_NUM_SEEDS[seed]
+    if filled_slots < num_slots:
+        return True
+    return False
+
+
+def find_seeds(ranked_field):
+    seeds = {}
+
+    seed = 1
+    for team in ranked_field:
+        if seed not in seeds:
+            seeds[seed] = [team]
+            continue
+        if slot_open(seed, len(seeds[seed])):
+            seeds[seed].append(team)
+        else:
+            seed += 1
+            seeds[seed] = [team]
+    return seeds
+
+
+def save_field(field, mongo_url, skip_save_to_mongodb):
+    with open('ncaa-field.json', 'w') as f:
+        json.dump(field, f)
+    if skip_save_to_mongodb:
+        return
+    client = MongoClient(mongo_url)
+    db = client.clarktechsports
+    db.ncaa_field.update_many({}, {'$set': {'latest': False}})
+    db.ncaa_field.insert({'latest': True, 'field': field})
+
+
 def start_daily_simulations(predictor, teams, mongo_url, skip_save_to_mongodb,
                             rankings, num_sims):
     matchups = find_todays_games(teams)
@@ -537,6 +630,7 @@ def start_power_rankings(predictor, teams, rankings, num_sims, mongo_url,
 
 def start_conference_tournament_simulator(predictor, teams, rankings,
                                           num_sims):
+    winners = {}
     simulation = load_simulation()
     stats_dict, stdev_dict = find_stdev_for_every_stat(teams, rankings)
     for conference, bracket in BRACKETS.items():
@@ -547,6 +641,8 @@ def start_conference_tournament_simulator(predictor, teams, rankings,
         print('=' * 80)
         print(' %s Champion: %s' % (conference, winner))
         print('=' * 80)
+        winners[conference] = winner
+    return winners
 
 
 def start_ncaa_tournament_simulator(predictor, teams, rankings, num_sims,
@@ -570,6 +666,16 @@ def start_ncaa_tournament_simulator(predictor, teams, rankings, num_sims,
                                                     num_wins, num_sims)
         display_predictions(prediction_list)
         field = reduce_field(prediction_list, field)
+
+
+def start_ncaa_field_filler(predictor, teams, rankings, num_sims, mongo_url,
+                            skip_save_to_mongodb):
+    auto_bids = automatic_bids(predictor, teams, rankings, num_sims)
+    power_rankings = load_rankings()
+    field = populate_field(auto_bids, power_rankings)
+    ranked_field = sort_field(field, power_rankings)
+    seeds = find_seeds(ranked_field)
+    save_field(seeds, mongo_url, skip_save_to_mongodb)
 
 
 def initiate_algorithm(args, predictor, teams, rankings):
@@ -599,6 +705,9 @@ def initiate_algorithm(args, predictor, teams, rankings):
     elif args.algorithm == TOURNAMENT_SIMULATOR:
         start_ncaa_tournament_simulator(predictor, teams, rankings,
                                         args.num_sims, args.filename)
+    elif args.algorithm == FILL_NCAA_FIELD:
+        start_ncaa_field_filler(predictor, teams, rankings, args.num_sims,
+                                args.mongodb_url, args.skip_save_to_mongodb)
 
 
 def arguments():
@@ -621,6 +730,10 @@ def arguments():
     'conference tournament to determine the overall outcome. Seeds are based '
     'on projected final position in the conference standings according to the '
     'conference simulator algorithm.')
+    subparser.add_parser(FILL_NCAA_FIELD, help='Predict the teams that will '
+    'make the NCAA tournament either by way of an at-large bid or with an '
+    'automatic bid by winning their conference tournament. The field includes '
+    'each team\'s respective seed.')
     matchup = subparser.add_parser(MATCHUP, help='Simulate the outcome between'
     ' two specific teams and determine the overall winner.')
     matchup.add_argument('home', help='Specify the home team\'s abbreviation, '
