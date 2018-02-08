@@ -118,7 +118,9 @@ def extract_stats_components(stats, away=False):
     return stats
 
 
-def create_prediction_data(match_data, inverted_conferences, winner, loser):
+def create_prediction_data(match_data, inverted_conferences, winner, loser,
+                           winner_prob, loser_prob, winner_points,
+                           loser_points):
     tags = []
     if match_data.top_25:
         tags = ['Top 25']
@@ -126,8 +128,9 @@ def create_prediction_data(match_data, inverted_conferences, winner, loser):
     tags.append(inverted_conferences[match_data.away])
     tags = list(set(tags))
     prediction = [tags, match_data.home_nickname, match_data.home,
-                  match_data.away_nickname, match_data.away, winner,
-                  loser, match_data.game_time]
+                  match_data.away_nickname, match_data.away, winner, loser,
+                  winner_prob, loser_prob, winner_points, loser_points,
+                  match_data.game_time]
     return prediction
 
 
@@ -174,10 +177,42 @@ def get_game_information(game, stdev_dict):
     return m
 
 
-def get_winner(probability):
+def get_winner(probability, home, away):
     winner = max(probability, key=probability.get)
     loser = min(probability, key=probability.get)
+    if winner == loser:
+        # Default to home team winning in case of tie
+        if len(probability) != 1:
+            winner = str(home)
+            loser = str(away)
+        # One team is projected to win every simulation
+        else:
+            if winner == home:
+                loser = away
+            else:
+                loser = home
     return winner, loser
+
+
+def pad_probability(probability):
+    if probability > 0.99:
+        return 0.99
+    return probability
+
+
+def get_probability(num_wins, winner, loser):
+    winner_prob = pad_probability(float(num_wins[winner]) / float(NUM_SIMS))
+    try:
+        loser_prob = pad_probability(float(num_wins[loser]) / float(NUM_SIMS))
+    except:
+        loser_prob = 0.01
+    return winner_prob, loser_prob
+
+
+def get_points(points, winner, loser):
+    winner_points = float(points[winner]) / float(NUM_SIMS)
+    loser_points = float(points[loser]) / float(NUM_SIMS)
+    return winner_points, loser_points
 
 
 def make_predictions(prediction_stats, games_list, match_info, predictor):
@@ -189,27 +224,43 @@ def make_predictions(prediction_stats, games_list, match_info, predictor):
     prediction_data.rename(columns=FIELDS_TO_RENAME, inplace=True)
     prediction_data = predictor.simplify(prediction_data)
     predictions = predictor.predict(prediction_data, int)
-    probabilities = predictor.predict_probability(prediction_data)
     for sim in range(len(games_list) / NUM_SIMS):
-        total_probability = {}
+        total_points = {}
+        num_wins = {}
         for i in range(NUM_SIMS):
             x = sim * NUM_SIMS + i
-            winner = games_list[x][1][predictions[x]]
-            loser = games_list[x][1][abs(predictions[x]-1)]
-            winner_prob = probabilities[x][predictions[x]]
-            loser_prob = probabilities[x][abs(predictions[x]-1)]
+            winner_idx = list(predictions[x]).index(max(predictions[x]))
+            loser_idx = list(predictions[x]).index(min(predictions[x]))
+            # In the case of a tie, give precedence to the home team.
+            if winner_idx == loser_idx:
+                winner_idx = 0
+                loser_idx = 1
+            home = games_list[x][1][0]
+            away = games_list[x][1][1]
+            winner_points = predictions[x][winner_idx]
+            loser_points = predictions[x][loser_idx]
+            winner = games_list[x][1][winner_idx]
+            loser = games_list[x][1][loser_idx]
             try:
-                total_probability[winner] += winner_prob
+                total_points[winner] += winner_points
             except KeyError:
-                total_probability[winner] = winner_prob
+                total_points[winner] = winner_points
             try:
-                total_probability[loser] += loser_prob
+                total_points[loser] += loser_points
             except KeyError:
-                total_probability[loser] = loser_prob
-        winner, loser = get_winner(total_probability)
+                total_points[loser] = loser_points
+            try:
+                num_wins[winner] += 1
+            except KeyError:
+                num_wins[winner] = 1
+        winner, loser = get_winner(num_wins, home, away)
+        winner_prob, loser_prob = get_probability(num_wins, winner, loser)
+        winner_points, loser_points = get_points(total_points, winner, loser)
         display_prediction(games_list[sim*NUM_SIMS][0], winner)
         p = create_prediction_data(match_info[sim*NUM_SIMS],
-                                   inverted_conferences, winner, loser)
+                                   inverted_conferences, winner, loser,
+                                   winner_prob, loser_prob, winner_points,
+                                   loser_points)
         prediction_list.append(p)
     return prediction_list
 
@@ -269,7 +320,6 @@ def main():
     args = arguments()
     predictor = Predictor(args.dataset)
     find_todays_games(predictor)
-    predictor.accuracy
 
 
 if __name__ == "__main__":

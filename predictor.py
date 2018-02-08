@@ -6,7 +6,7 @@ from sklearn import tree
 from sklearn.externals.six import StringIO
 from sklearn.metrics import accuracy_score
 from sklearn.model_selection import train_test_split
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import RandomForestRegressor
 from sklearn.feature_selection import SelectFromModel
 
 
@@ -53,12 +53,9 @@ class Predictor:
                       'min_samples_split': 10,
                       'max_features': 'sqrt',
                       'max_depth': 6}
-        self._model = RandomForestClassifier(**parameters)
+        self._model = RandomForestRegressor(**parameters)
         self._model.fit(self._X_train, self._y_train)
         return test_data
-
-    def predict_probability(self, test_data):
-        return self._model.predict_proba(test_data)
 
     def predict(self, test_data, output_datatype):
         return self._model.predict(test_data).astype(output_datatype)
@@ -67,16 +64,19 @@ class Predictor:
         frames = [pd.read_csv(match) for match in glob('%s/*' % data_directory) \
                   if not match.endswith('.json')]
         data = pd.concat(frames)
+        data.drop('home_win', 1)
         return differential_vector(data)
 
     def _create_features(self, data):
+        X = data.drop('pts', 1)
+        X = data.drop('opp_pts', 1)
         X = data.drop('home_win', 1)
-        y = data.home_win
+        y = data.as_matrix(columns=['pts', 'opp_pts'])
         split_data = train_test_split(X, y)
         self._X_train, self._X_test, self._y_train, self._y_test = split_data
 
     def _create_classifier(self):
-        clf = RandomForestClassifier(n_estimators=50, max_features='sqrt')
+        clf = RandomForestRegressor(n_estimators=50, max_features='sqrt')
         self._classifier = clf.fit(self._X_train, self._y_train)
 
     def _train_model(self):

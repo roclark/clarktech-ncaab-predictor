@@ -130,7 +130,7 @@ def include_wins_and_losses(stats, wins, losses, away=False):
 
 
 def filter_stats(match_stats):
-    fields_to_drop = ['pts', 'opp_pts', 'g', 'opp_g']
+    fields_to_drop = ['g', 'opp_g', 'home_win']
     fields_to_rename = {'win_loss_pct': 'win_pct',
                         'opp_win_loss_pct': 'opp_win_pct'}
     for field in fields_to_drop:
@@ -160,6 +160,11 @@ def weighted_sos(stats, sos, win_pct, max_sos=None, min_sos=None, away=False):
 def differential_vector(stats):
     for home_feature, away_feature in FIELDS_TO_COMBINE.items():
         try:
+            # Rename the points since they are used as the y coordinates
+            # for the regressor.
+            if home_feature == 'pts':
+                stats['pts_diff'] = stats['pts'] - stats['opp_pts']
+                continue
             stats[home_feature] = stats[home_feature] - stats[away_feature]
             stats.drop(away_feature, 1, inplace=True)
         except KeyError:

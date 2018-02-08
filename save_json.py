@@ -5,7 +5,8 @@ from mascots import MASCOTS
 
 class Prediction:
     def __init__(self, tags, home_name, home_nickname, away_name, away_nickname,
-                 winner, loser, game_time):
+                 winner, loser, winner_prob, loser_prob, winner_points,
+                 loser_points, game_time):
         if winner == home_name:
             winner_nickname = home_nickname
             loser_nickname = away_nickname
@@ -30,11 +31,15 @@ class Prediction:
             "prediction": {
                 "winner": {
                     "name": winner,
+                    "points": winner_points,
+                    "probability": winner_prob,
                     "nickname": winner_nickname,
                     "mascot": MASCOTS[winner_nickname],
                 },
                 "loser": {
                     "name": loser,
+                    "points": loser_points,
+                    "probability": loser_prob,
                     "nickname": loser_nickname,
                     "mascot": MASCOTS[loser_nickname],
                 }
