@@ -56,9 +56,13 @@ def extract_stats_components(stats, away=False):
     return stats
 
 
+def get_winner(game, prediction):
+    return game[list(prediction).index(max(list(prediction)))]
+
+
 def get_totals(games_list, predictions, team_wins, conference_wins):
     for i in range(0, len(games_list)):
-        winner = games_list[i][predictions[i]]
+        winner = get_winner(games_list[i], predictions[i])
         team_wins[winner] += 1
     for team, wins in conference_wins.items():
         team_wins[team] += wins
