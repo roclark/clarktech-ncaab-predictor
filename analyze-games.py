@@ -4,10 +4,7 @@ import os
 import pandas as pd
 import random
 import re
-import requests
-from bs4 import BeautifulSoup
-from common import (convert_team_totals_to_averages,
-                    differential_vector,
+from common import (differential_vector,
                     extract_stats_components,
                     read_team_stats_file)
 from constants import YEAR
@@ -18,15 +15,27 @@ from pymongo import MongoClient
 from save_json import save_predictions_json
 from sportsreference.ncaab.boxscore import Boxscores
 from sportsreference.ncaab.conferences import Conferences
-from teams import TEAMS
+from sportsreference.ncaab.teams import Teams
 
 
 AWAY = 0
 HOME = 1
 NUM_SIMS = 100
-TEAM_NAME_REGEX = 'schools/.*?/%s.html' % YEAR
-HOME_PAGE = 'http://www.sports-reference.com/cbb/'
 FIELDS_TO_RENAME = {'win_loss_pct': 'win_pct'}
+FIELDS_TO_DROP = ['abbreviation', 'conference', 'name']
+
+
+class GameInfo:
+    def __init__(self, home, away, title):
+        self.home = home
+        self.away = away
+        self.title = title
+
+
+class Team:
+    def __init__(self, name, abbreviation):
+        self.name = name
+        self.abbreviation = abbreviation
 
 
 class MatchInfo:
@@ -75,10 +84,16 @@ def display_prediction(matchup, result):
 
 
 def convert_team_totals_to_averages(stats):
-    fields_to_average = ['mp', 'fg', 'fga', 'fg2', 'fg2a', 'fg3', 'fg3a', 'ft',
-                         'fta', 'orb', 'drb', 'trb', 'ast', 'stl', 'blk', 'tov',
-                         'pf', 'pts']
-    num_games = stats['g']
+    fields_to_average = ['assists', 'blocks', 'defensive_rebounds',
+                         'field_goal_attempts', 'field_goals',
+                         'free_throw_attempts', 'free_throws',
+                         'minutes_played', 'offensive_rebounds',
+                         'personal_fouls', 'points', 'steals',
+                         'three_point_field_goal_attempts',
+                         'three_point_field_goals', 'total_rebounds',
+                         'turnovers', 'two_point_field_goal_attempts',
+                         'two_point_field_goals']
+    num_games = stats['games_played']
     new_stats = stats.copy()
 
     for field in fields_to_average:
@@ -94,9 +109,13 @@ def extract_stats_components(stats, away=False):
     stats = stats[filtered_columns]
     stats = convert_team_totals_to_averages(stats)
     if away:
-        # Prepend all stats with 'opp_' to signify the away team as such.
-        away_columns = ['opp_%s' % col for col in stats]
+        # Prepend all stats with 'away_' to signify the away team as such.
+        away_columns = ['away_%s' % col for col in stats]
         stats.columns = away_columns
+    else:
+        # Prepend all stats with 'home_' to signify the home team as such.
+        home_columns = ['home_%s' % col for col in stats]
+        stats.columns = home_columns
     return stats
 
 
@@ -143,6 +162,8 @@ def create_variance(stats, stdev_dict):
     local_stats = {}
 
     for stat in stats:
+        if stat.startswith('opp_'):
+            continue
         min_val = -1 * float(stdev_dict[stat])
         max_val = abs(min_val)
         variance = random.uniform(min_val, max_val)
@@ -153,9 +174,24 @@ def create_variance(stats, stdev_dict):
 
 def get_stats(stats_filename, stdev_dict, away=False):
     stats = read_team_stats_file(stats_filename)
+    for field in FIELDS_TO_DROP:
+        stats.drop(field, 1, inplace=True)
+    if 'defensive_rating' not in stats and \
+       'offensive_rating' in stats and \
+       'net_rating' in stats:
+        stats['defensive_rating'] = stats['offensive_rating'] - \
+            stats['net_rating']
     if stdev_dict:
         stats = create_variance(stats, stdev_dict)
-    return extract_stats_components(stats, away)
+        stats = extract_stats_components(stats, away)
+    else:
+        # Get all of the stats that don't start with 'opp', AKA all of the
+        # stats that are directly related to the indicated team.
+        filtered_columns = [col for col in stats if not \
+                            str(col).startswith('opp_')]
+        stats = stats[filtered_columns]
+        stats = convert_team_totals_to_averages(stats)
+    return stats
 
 
 def get_match_stats(game, stdev_dict):
@@ -215,6 +251,8 @@ def make_predictions(prediction_stats, games_list, match_info, predictor):
 
     prediction_data = pd.concat(prediction_stats)
     prediction_data = differential_vector(prediction_data)
+    prediction_data['points_difference'] = prediction_data['home_points'] - \
+        prediction_data['away_points']
     prediction_data.rename(columns=FIELDS_TO_RENAME, inplace=True)
     prediction_data = predictor.simplify(prediction_data)
     predictions = predictor.predict(prediction_data, int)
@@ -228,13 +266,19 @@ def make_predictions(prediction_stats, games_list, match_info, predictor):
             # In the case of a tie, give precedence to the home team.
             if winner_idx == loser_idx:
                 winner_idx = 0
+                winner = games_list[x].home.abbreviation
                 loser_idx = 1
-            home = games_list[x][1][0]
-            away = games_list[x][1][1]
+                loser = games_list[x].away.abbreviation
+            elif winner_idx == 0:
+                winner = games_list[x].home.abbreviation
+                loser = games_list[x].away.abbreviation
+            else:
+                winner = games_list[x].away.abbreviation
+                loser = games_list[x].home.abbreviation
+            home = games_list[x].home.abbreviation
+            away = games_list[x].away.abbreviation
             winner_points = predictions[x][winner_idx]
             loser_points = predictions[x][loser_idx]
-            winner = games_list[x][1][winner_idx]
-            loser = games_list[x][1][loser_idx]
             try:
                 total_points[winner] += winner_points
             except KeyError:
@@ -250,7 +294,7 @@ def make_predictions(prediction_stats, games_list, match_info, predictor):
         winner, loser = get_winner(num_wins, home, away)
         winner_prob, loser_prob = get_probability(num_wins, winner, loser)
         winner_points, loser_points = get_points(total_points, winner, loser)
-        display_prediction(games_list[sim*NUM_SIMS][0], winner)
+        display_prediction(games_list[sim*NUM_SIMS].title, winner)
         p = create_prediction_data(match_info[sim*NUM_SIMS], conferences,
                                    winner, loser, winner_prob, loser_prob,
                                    winner_points, loser_points)
@@ -258,24 +302,27 @@ def make_predictions(prediction_stats, games_list, match_info, predictor):
     return prediction_list
 
 
-def find_stdev_for_every_stat():
+def find_stdev_for_every_stat(teams):
     stats_list = []
     stdev_dict = {}
 
-    for team in TEAMS.values():
-        stats_list.append(get_stats('team-stats/%s' % team, None))
+    for team in teams:
+        filename = 'team-stats/%s' % team.abbreviation.lower()
+        stats_list.append(get_stats(filename, None))
     stats_dataframe = pd.concat(stats_list)
     for col in stats_dataframe:
+        if col in FIELDS_TO_DROP:
+            continue
         stdev_dict[col] = stats_dataframe[col].std()
     return stdev_dict
 
 
-def parse_boxscores(predictor, skip_save_to_mongodb):
+def parse_boxscores(predictor, teams, skip_save_to_mongodb):
     games_list = []
     match_info = []
     prediction_stats = []
 
-    stdev_dict = find_stdev_for_every_stat()
+    stdev_dict = find_stdev_for_every_stat(teams)
     today = datetime.today()
     today_string = '%s-%s-%s' % (today.month, today.day, today.year)
     for game in Boxscores(today).games[today_string]:
@@ -284,9 +331,11 @@ def parse_boxscores(predictor, skip_save_to_mongodb):
         if game['non_di']:
             continue
         for sim in range(NUM_SIMS):
-            games_list.append(['%s at %s' % (game['away_name'],
-                                             game['home_name']),
-                              [game['home_abbr'], game['away_abbr']]])
+            home = Team(game['home_name'], game['home_abbr'])
+            away = Team(game['away_name'], game['away_abbr'])
+            title = '%s at %s' % (away.name, home.name)
+            game_info = GameInfo(home, away, title)
+            games_list.append(game_info)
             match_stats = get_match_stats(game, stdev_dict)
             prediction_stats.append(match_stats)
             home_name = game['home_name']
@@ -315,9 +364,12 @@ def arguments():
 
 
 def main():
+    teams = []
     args = arguments()
     predictor = Predictor(args.dataset)
-    parse_boxscores(predictor, args.skip_save_to_mongodb)
+    for team in Teams():
+        teams.append(Team(team.name, team.abbreviation))
+    parse_boxscores(predictor, teams, args.skip_save_to_mongodb)
 
 
 if __name__ == "__main__":

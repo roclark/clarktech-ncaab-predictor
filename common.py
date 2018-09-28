@@ -6,100 +6,50 @@ import requests
 
 
 FIELDS_TO_COMBINE = {
-    'pts': 'opp_pts',
-    'fg2a': 'opp_fg2a',
-    'losses': 'opp_losses',
-    'sos': 'opp_sos',
-    'trb': 'opp_trb',
-    'fg_pct': 'opp_fg_pct',
-    'fg2': 'opp_fg2',
-    'fg3': 'opp_fg3',
-    'win_pct': 'opp_win_pct',
-    'weighted_sos': 'opp_weighted_sos',
-    'fg3_pct': 'opp_fg3_pct',
-    'tov': 'opp_tov',
-    'fta': 'opp_fta',
-    'mp': 'opp_mp',
-    'stl': 'opp_stl',
-    'fg3a': 'opp_fg3a',
-    'pf': 'opp_pf',
-    'blk': 'opp_blk',
-    'ft_pct': 'opp_ft_pct',
-    'ft': 'opp_ft',
-    'orb': 'opp_orb',
-    'ast': 'opp_ast',
-    'fg': 'opp_fg',
-    'fga': 'opp_fga',
-    'tov': 'opp_tov',
-    'wins': 'opp_wins',
-    'drb': 'opp_drb',
-    'fg2_pct': 'opp_fg2_pct',
-    'ranked': 'opp_ranked',
-    'win_loss_pct': 'opp_win_loss_pct',
-    'pace': 'opp_pace',
-    'off_rtg': 'opp_off_rtg',
-    'def_rtg': 'opp_def_rtg',
-    'net_rtg': 'opp_net_rtg',
-    'ftr': 'opp_ftr',
-    'fg3a_per_fga_pct': 'opp_fg3a_per_fga_pct',
-    'fta_per_fga_pct': 'opp_fta_per_fga_pct',
-    'ft_rate': 'opp_ft_rate',
-    'ts_pct': 'opp_ts_pct',
-    'trb_pct': 'opp_trb_pct',
-    'ast_pct': 'opp_ast_pct',
-    'stl_pct': 'opp_stl_pct',
-    'blk_pct': 'opp_blk_pct',
-    'efg_pct': 'opp_efg_pct',
-    'tov_pct': 'opp_tov_pct',
-    'orb_pct': 'opp_orb_pct'
+    'home_assist_percentage': 'away_assist_percentage',
+    'home_assists': 'away_assists',
+    'home_block_percentage': 'away_block_percentage',
+    'home_blocks': 'away_blocks',
+    'home_defensive_rating': 'away_defensive_rating',
+    'home_defensive_rebound_percentage': 'away_defensive_rebound_percentage',
+    'home_defensive_rebounds': 'away_defensive_rebounds',
+    'home_effective_field_goal_percentage': 'away_effective_field_goal_percentage',
+    'home_field_goal_attempts': 'away_field_goal_attempts',
+    'home_field_goal_percentage': 'away_field_goal_percentage',
+    'home_field_goals': 'away_field_goals',
+    'home_free_throw_attempt_rate': 'away_free_throw_attempt_rate',
+    'home_free_throw_attempts': 'away_free_throw_attempts',
+    'home_free_throw_percentage': 'away_free_throw_percentage',
+    'home_free_throws': 'away_free_throws',
+    'home_losses': 'away_losses',
+    'home_minutes_played': 'away_minutes_played',
+    'home_offensive_rating': 'away_offensive_rating',
+    'home_offensive_rebound_percentage': 'away_offensive_rebound_percentage',
+    'home_offensive_rebounds': 'away_offensive_rebounds',
+    'home_personal_fouls': 'away_personal_fouls',
+    'home_steal_percentage': 'away_steal_percentage',
+    'home_steals': 'away_steals',
+    'home_three_point_attempt_rate': 'away_three_point_attempt_rate',
+    'home_three_point_field_goal_attempts': 'away_three_point_field_goal_attempts',
+    'home_three_point_field_goal_percentage': 'away_three_point_field_goal_percentage',
+    'home_three_point_field_goals': 'away_three_point_field_goals',
+    'home_total_rebound_percentage': 'away_total_rebound_percentage',
+    'home_total_rebounds': 'away_total_rebounds',
+    'home_true_shooting_percentage': 'away_true_shooting_percentage',
+    'home_turnover_percentage': 'away_turnover_percentage',
+    'home_turnovers': 'away_turnovers',
+    'home_two_point_field_goal_attempts': 'away_two_point_field_goal_attempts',
+    'home_two_point_field_goal_percentage': 'away_two_point_field_goal_percentage',
+    'home_two_point_field_goals': 'away_two_point_field_goals',
+    'home_win_percentage': 'away_win_percentage',
+    'home_wins': 'away_wins',
+    'pace': 'pace',
 }
-
-
-def include_team_rank(team_stats, ranking, away=False):
-    tier1 = 'rank1-5'
-    tier2 = 'rank6-10'
-    tier3 = 'rank11-15'
-    tier4 = 'rank16-20'
-    tier5 = 'rank21-25'
-    overall = 'ranked'
-
-    if away:
-        tier1 = 'opp_rank1-5'
-        tier2 = 'opp_rank6-10'
-        tier3 = 'opp_rank11-15'
-        tier4 = 'opp_rank16-20'
-        tier5 = 'opp_rank21-25'
-        overall = 'opp_ranked'
-
-    team_stats[tier1] = 0
-    team_stats[tier2] = 0
-    team_stats[tier3] = 0
-    team_stats[tier4] = 0
-    team_stats[tier5] = 0
-    team_stats[overall] = 0
-
-    try:
-        ranking = int(ranking)
-    except ValueError:
-        return team_stats
-
-    if ranking < 6:
-        team_stats[tier1] = 1
-    elif ranking < 11:
-        team_stats[tier2] = 1
-    elif ranking < 16:
-        team_stats[tier3] = 1
-    elif ranking < 21:
-        team_stats[tier4] = 1
-    elif ranking < 26:
-        team_stats[tier5] = 1
-    team_stats[overall] = 1
-    return team_stats
 
 
 def read_team_stats_file(team_filename):
     team_filename = re.sub('\(\d+\) +', '', team_filename)
-    return pd.read_csv(team_filename)
+    return pd.read_pickle('%s.plk' % team_filename)
 
 
 def make_request(session, url):
@@ -130,31 +80,19 @@ def include_wins_and_losses(stats, wins, losses, away=False):
 
 
 def filter_stats(match_stats):
-    fields_to_drop = ['g', 'opp_g', 'home_win']
-    fields_to_rename = {'win_loss_pct': 'win_pct',
-                        'opp_win_loss_pct': 'opp_win_pct'}
+    fields_to_drop = ['abbreviation', 'date', 'location', 'name', 'pace',
+                      'winning_abbr', 'winning_name', 'losing_abbr',
+                      'losing_name', 'winner']
     for field in fields_to_drop:
-        match_stats.drop(field, 1, inplace=True)
-    match_stats.rename(columns=fields_to_rename, inplace=True)
+        try:
+            match_stats.drop(field, 1, inplace=True)
+        except KeyError:
+            continue
+    match_stats['away_ranking'] = match_stats['away_ranking'] \
+        .notnull().astype('int')
+    match_stats['home_ranking'] = match_stats['home_ranking'] \
+        .notnull().astype('int')
     return match_stats
-
-
-def weighted_sos(stats, sos, win_pct, max_sos=None, min_sos=None, away=False):
-    try:
-        from sos import MAX_SOS
-        from sos import MIN_SOS
-        min_sos = MIN_SOS
-        max_sos = MAX_SOS
-    except ImportError:
-        pass
-    sos_range = max_sos - min_sos
-    weighted_sos = sos - min_sos
-    weighted_sos *= win_pct
-    if away:
-        stats['opp_weighted_sos'] = weighted_sos
-    else:
-        stats['weighted_sos'] = weighted_sos
-    return stats
 
 
 def differential_vector(stats):
@@ -165,8 +103,10 @@ def differential_vector(stats):
             if home_feature == 'pts':
                 stats['pts_diff'] = stats['pts'] - stats['opp_pts']
                 continue
-            stats[home_feature] = stats[home_feature] - stats[away_feature]
+            feature = home_feature.replace('home_', '')
+            stats[feature] = stats[home_feature] - stats[away_feature]
             stats.drop(away_feature, 1, inplace=True)
+            stats.drop(home_feature, 1, inplace=True)
         except KeyError:
             continue
     return stats

@@ -2,8 +2,6 @@ import argparse
 import numpy
 import pandas as pd
 import re
-import requests
-from bs4 import BeautifulSoup
 from common import differential_vector, filter_stats, read_team_stats_file
 from constants import YEAR
 from datetime import datetime

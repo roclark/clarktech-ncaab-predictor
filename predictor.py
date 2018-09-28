@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from common import differential_vector
+from common import differential_vector, filter_stats
 from glob import glob
 from sklearn import tree
 from sklearn.externals.six import StringIO
@@ -12,7 +12,7 @@ from sklearn.feature_selection import SelectFromModel
 
 class Predictor:
     def __init__(self, data_directory='matches'):
-        self._classifier = None
+        self._regressor = None
         self._model = None
         self._X_train = None
         self._X_test = None
@@ -21,7 +21,7 @@ class Predictor:
 
         data = self._read_data(data_directory)
         self._create_features(data)
-        self._create_classifier()
+        self._create_regressor()
         self._train_model()
 
     @property
@@ -61,27 +61,32 @@ class Predictor:
         return self._model.predict(test_data).astype(output_datatype)
 
     def _read_data(self, data_directory):
-        frames = [pd.read_csv(match) for match in glob('%s/*' % data_directory) \
-                  if not match.endswith('.json')]
+        frames = [pd.read_pickle(match) for match in \
+                  glob('%s/*/*' % data_directory)]
         data = pd.concat(frames)
-        data.drop('home_win', 1)
+        data.drop_duplicates(inplace=True)
+        data = filter_stats(data)
+        data = data.dropna()
+        data['home_free_throw_percentage'].fillna(0, inplace=True)
+        data['away_free_throw_percentage'].fillna(0, inplace=True)
+        data['points_difference'] = data['home_points'] - data['away_points']
         return differential_vector(data)
 
     def _create_features(self, data):
-        X = data.drop('pts', 1)
-        X = data.drop('opp_pts', 1)
-        X = data.drop('home_win', 1)
-        y = data.as_matrix(columns=['pts', 'opp_pts'])
+        X = data.drop('away_points', 1)
+        X = X.drop('home_points', 1)
+        y = data[['home_points', 'away_points']].values
         split_data = train_test_split(X, y)
         self._X_train, self._X_test, self._y_train, self._y_test = split_data
 
-    def _create_classifier(self):
-        clf = RandomForestRegressor(n_estimators=50, max_features='sqrt')
-        self._classifier = clf.fit(self._X_train, self._y_train)
+    def _create_regressor(self):
+        reg = RandomForestRegressor(n_estimators=50, max_features='sqrt')
+        self._regressor = reg.fit(self._X_train, self._y_train)
 
     def _train_model(self):
         train = self._X_train
-        self._model = SelectFromModel(self._classifier, prefit=True)
+        self._model = SelectFromModel(self._regressor, prefit=True,
+                                      threshold=0.01)
         self._X_train = self._model.transform(self._X_train)
         new_columns = train.columns[self._model.get_support()]
         self._filtered_features = [str(col) for col in new_columns]

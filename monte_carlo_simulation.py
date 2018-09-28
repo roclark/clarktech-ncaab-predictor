@@ -14,7 +14,7 @@ NUM_SIMS = 200
 
 
 def read_team_stats_file(team_filename):
-    return pd.read_csv(team_filename)
+    return pd.read_pickle(team_filename)
 
 
 def convert_team_totals_to_averages(stats):
@@ -173,7 +173,7 @@ def predict_all_simulations(predictor, stats_dict, stdev_dict, conference,
 
 
 def get_conference_wins(team):
-    stats = read_team_stats_file('team-stats/%s' % team)
+    stats = read_team_stats_file('team-stats/%s.pkl' % team)
     return int(stats['wins_conf'])
 
 
