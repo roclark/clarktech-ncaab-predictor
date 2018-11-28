@@ -12,11 +12,12 @@ from common import (convert_team_totals_to_averages,
                     read_team_stats_file)
 from constants import YEAR
 from datetime import datetime
+from mascots import MASCOTS
 from predictor import Predictor
 from save_json import save_predictions_json
 from sportsreference.ncaab.boxscore import Boxscores
 from sportsreference.ncaab.conferences import Conferences
-from teams import TEAMS
+from teams import TEAMS, TEAMS_INVERTED
 
 
 AWAY = 0
@@ -90,16 +91,33 @@ def extract_stats_components(stats, away=False):
 def create_prediction_data(match_data, inverted_conferences, winner, loser,
                            winner_prob, loser_prob, winner_points,
                            loser_points):
-    tags = []
+    tags = ['all']
     if match_data.top_25:
-        tags = ['Top 25']
-    tags.append(inverted_conferences[match_data.home])
-    tags.append(inverted_conferences[match_data.away])
+        tags += ['top-25']
+    tags.append(inverted_conferences[match_data.home_nickname])
+    tags.append(inverted_conferences[match_data.away_nickname])
     tags = list(set(tags))
-    prediction = [tags, match_data.home_nickname, match_data.home,
-                  match_data.away_nickname, match_data.away, winner, loser,
-                  winner_prob, loser_prob, winner_points, loser_points,
-                  match_data.game_time]
+    prediction = {
+        'latest': True,
+        'homeName': match_data.home,
+        'homeAbbreviation': match_data.home_nickname,
+        'homeMascot': MASCOTS[match_data.home_nickname],
+        'awayName': match_data.away,
+        'awayAbbreviation': match_data.away_nickname,
+        'awayMascot': MASCOTS[match_data.away_nickname],
+        'time': match_data.game_time,
+        'predictedWinner': TEAMS_INVERTED[winner],
+        'predictedWinnerAbbreviation': winner,
+        'predictedWinnerMascot': MASCOTS[winner],
+        'predictedLoser': TEAMS_INVERTED[loser],
+        'predictedLoserAbbreviation': loser,
+        'predictedLoserMascot': MASCOTS[loser],
+        'winnerPoints': winner_points,
+        'winnerProbability': winner_prob,
+        'loserPoints': loser_points,
+        'loserProbability': loser_prob,
+        'tags': tags
+    }
     return prediction
 
 
@@ -251,8 +269,8 @@ def parse_boxscores(predictor):
                               [game['home_abbr'], game['away_abbr']]])
             match_stats = get_match_stats(game, stdev_dict)
             prediction_stats.append(match_stats)
-            g = MatchInfo(game['away_abbr'], game['home_abbr'],
-                          game['away_name'], game['home_name'],
+            g = MatchInfo(game['away_name'], game['home_name'],
+                          game['away_abbr'], game['home_abbr'],
                           False, None, match_stats)
             match_info.append(g)
     predictions = make_predictions(prediction_stats, games_list, match_info,

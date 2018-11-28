@@ -171,6 +171,11 @@ def write_teams_list(teams_list):
             name, nickname = team
             teams_file.write('    "%s": "%s",\n' % (name, nickname))
         teams_file.write('}\n')
+        teams_file.write('TEAMS_INVERTED = {\n')
+        for team in teams_list:
+            name, nickname = team
+            teams_file.write('    "%s": "%s",\n' % (nickname, name))
+        teams_file.write('}\n')
 
 
 def get_rankings(session):
