@@ -10,11 +10,12 @@ from common import (convert_team_totals_to_averages,
                     differential_vector,
                     extract_stats_components,
                     read_team_stats_file)
-from conferences import CONFERENCES
 from constants import YEAR
 from datetime import datetime
 from predictor import Predictor
 from save_json import save_predictions_json
+from sportsreference.ncaab.boxscore import Boxscores
+from sportsreference.ncaab.conferences import Conferences
 from teams import TEAMS
 
 
@@ -44,40 +45,6 @@ def team_ranked(team):
         if team_stats['rank'] != 'NR':
             return team_stats['rank']
         return None
-
-
-def extract_team(team_link, top_25=False):
-    try:
-        team = re.findall(TEAM_NAME_REGEX, str(team_link))[0]
-        team = team.replace('schools/', '')
-        team = team.replace('/%s.html' % YEAR, '')
-        name = team_link.get_text().strip()
-        rank = team_ranked(team)
-        if rank:
-            name = '(%s) %s' % (rank, name)
-            top_25 = True
-        return team, name, top_25
-    except IndexError:
-        return None, None, None
-
-
-def extract_teams_from_game(game_table):
-    top_25 = False
-
-    teams = game_table.find_all('a')
-    try:
-        away_team, away_name, top_25 = extract_team(teams[AWAY])
-        home_team, home_name, top_25 = extract_team(teams[HOME], top_25)
-    except IndexError:
-        return None, None, None, None, None
-    if not away_team or not home_team:
-        return None, None, None, None, None
-    return away_team, home_team, away_name, home_name, top_25
-
-
-def find_game_time(game_table):
-    time = re.findall('\d+:\d+ [A|P]M', str(game_table))
-    return time[0]
 
 
 def save_predictions(predictions):
@@ -136,15 +103,6 @@ def create_prediction_data(match_data, inverted_conferences, winner, loser,
     return prediction
 
 
-def invert_conference_dict():
-    new_dict = {}
-
-    for conference, value in CONFERENCES.items():
-        for team in value:
-            new_dict[team] = conference
-    return new_dict
-
-
 def create_variance(stats, stdev_dict):
     local_stats = {}
 
@@ -164,19 +122,17 @@ def get_stats(stats_filename, stdev_dict, away=False):
     return extract_stats_components(stats, away)
 
 
-def get_game_information(game, stdev_dict):
-    away, home, away_name, home_name, top_25 = extract_teams_from_game(game)
-    # Occurs when a DI school plays a non-DI school
-    # The parser does not save stats for non-DI schools
-    if away is None or home is None:
+def get_match_stats(game, stdev_dict):
+    # No stats are saved for non-DI schools, so ignore predictions for matchups
+    # that include non-DI schools.
+    if game['non_di']:
         return None
-    game_time = find_game_time(game)
-    away_stats = get_stats('team-stats/%s' % away, stdev_dict, away=True)
-    home_stats = get_stats('team-stats/%s' % home, stdev_dict, away=False)
+    away_stats = get_stats('team-stats/%s' % game['away_abbr'], stdev_dict,
+                           away=True)
+    home_stats = get_stats('team-stats/%s' % game['home_abbr'], stdev_dict,
+                           away=False)
     match_stats = pd.concat([away_stats, home_stats], axis=1)
-    m = MatchInfo(away, home, away_name, home_name, top_25, game_time,
-                  match_stats)
-    return m
+    return match_stats
 
 
 def get_winner(probability, home, away):
@@ -219,7 +175,7 @@ def get_points(points, winner, loser):
 
 def make_predictions(prediction_stats, games_list, match_info, predictor):
     prediction_list = []
-    inverted_conferences = invert_conference_dict()
+    conferences = Conferences().team_conference
 
     prediction_data = pd.concat(prediction_stats)
     prediction_data = differential_vector(prediction_data)
@@ -259,10 +215,9 @@ def make_predictions(prediction_stats, games_list, match_info, predictor):
         winner_prob, loser_prob = get_probability(num_wins, winner, loser)
         winner_points, loser_points = get_points(total_points, winner, loser)
         display_prediction(games_list[sim*NUM_SIMS][0], winner)
-        p = create_prediction_data(match_info[sim*NUM_SIMS],
-                                   inverted_conferences, winner, loser,
-                                   winner_prob, loser_prob, winner_points,
-                                   loser_points)
+        p = create_prediction_data(match_info[sim*NUM_SIMS], conferences,
+                                   winner, loser, winner_prob, loser_prob,
+                                   winner_points, loser_points)
         prediction_list.append(p)
     return prediction_list
 
@@ -279,34 +234,30 @@ def find_stdev_for_every_stat():
     return stdev_dict
 
 
-def parse_boxscores(boxscore_html, predictor):
+def parse_boxscores(predictor):
     games_list = []
     match_info = []
     prediction_stats = []
 
     stdev_dict = find_stdev_for_every_stat()
-    games_table = boxscore_html.find('div', {'class': '', 'id': 'games'})
-    # The value at index 0 corresponds to today's games
-    games_table = games_table.find_all('div')[0]
-    games = games_table.find_all('span')
-    for game in games:
+    for game in Boxscores(datetime.today()).games['boxscores']:
+        # Skip the games that are not between two DI teams since stats are not
+        # saved for those teams.
+        if game['non_di']:
+            continue
         for sim in range(NUM_SIMS):
-            g = get_game_information(game, stdev_dict)
-            if not g:
-                continue
-            games_list.append(['%s at %s' % (g.away_nickname, g.home_nickname),
-                              [g.home_nickname, g.away_nickname]])
-            prediction_stats.append(g.match_stats)
+            games_list.append(['%s at %s' % (game['away_name'],
+                                             game['home_name']),
+                              [game['home_abbr'], game['away_abbr']]])
+            match_stats = get_match_stats(game, stdev_dict)
+            prediction_stats.append(match_stats)
+            g = MatchInfo(game['away_abbr'], game['home_abbr'],
+                          game['away_name'], game['home_name'],
+                          False, None, match_stats)
             match_info.append(g)
     predictions = make_predictions(prediction_stats, games_list, match_info,
                                    predictor)
     save_predictions(predictions)
-
-
-def find_todays_games(predictor):
-    boxscores = requests.get(HOME_PAGE)
-    boxscore_html = BeautifulSoup(boxscores.text, 'lxml')
-    parse_boxscores(boxscore_html, predictor)
 
 
 def arguments():
@@ -321,7 +272,7 @@ def arguments():
 def main():
     args = arguments()
     predictor = Predictor(args.dataset)
-    find_todays_games(predictor)
+    parse_boxscores(predictor)
 
 
 if __name__ == "__main__":

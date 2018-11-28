@@ -349,5 +349,7 @@ MASCOTS = {
     'southern-illinois-edwardsville': 'Cougars',
     'loyola-il': 'Ramblers',
     'tennessee-martin': 'Skyhawks',
-    'cal-state-bakersfield': 'Roadrunners'
+    'cal-state-bakersfield': 'Roadrunners',
+    'california-baptist': 'Lancers',
+    'north-alabama': 'Lions'
 }
