@@ -14,6 +14,7 @@ from constants import YEAR
 from datetime import datetime
 from mascots import MASCOTS
 from predictor import Predictor
+from pymongo import MongoClient
 from save_json import save_predictions_json
 from sportsreference.ncaab.boxscore import Boxscores
 from sportsreference.ncaab.conferences import Conferences
@@ -48,7 +49,16 @@ def team_ranked(team):
         return None
 
 
-def save_predictions(predictions):
+def save_to_mongodb(predictions):
+    client = MongoClient()
+    db = client.clarktechsports
+    # Clear all of the existing predictions and add predictions for the
+    # current day
+    db.predictions.update_many({}, {'$set': {'latest': False}})
+    db.predictions.insert_many(predictions)
+
+
+def save_predictions(predictions, skip_save_to_mongodb):
     today = datetime.now()
     if not os.path.exists('predictions'):
         os.makedirs('predictions')
@@ -56,6 +66,8 @@ def save_predictions(predictions):
                                               today.day,
                                               today.year)
     save_predictions_json(predictions, filename)
+    if not skip_save_to_mongodb:
+        save_to_mongodb(predictions)
 
 
 def display_prediction(matchup, result):
@@ -252,7 +264,7 @@ def find_stdev_for_every_stat():
     return stdev_dict
 
 
-def parse_boxscores(predictor):
+def parse_boxscores(predictor, skip_save_to_mongodb):
     games_list = []
     match_info = []
     prediction_stats = []
@@ -282,7 +294,7 @@ def parse_boxscores(predictor):
             match_info.append(g)
     predictions = make_predictions(prediction_stats, games_list, match_info,
                                    predictor)
-    save_predictions(predictions)
+    save_predictions(predictions, skip_save_to_mongodb)
 
 
 def arguments():
@@ -291,13 +303,15 @@ def arguments():
     'testing purposes, use the "sample-data" directory. For production '
     'deployments, use "matches" with current data that was pulled.',
     default='matches')
+    parser.add_argument('--skip-save-to-mongodb', help='Optionally skip saving'
+    ' results to a MongoDB database.', action='store_true')
     return parser.parse_args()
 
 
 def main():
     args = arguments()
     predictor = Predictor(args.dataset)
-    parse_boxscores(predictor)
+    parse_boxscores(predictor, args.skip_save_to_mongodb)
 
 
 if __name__ == "__main__":

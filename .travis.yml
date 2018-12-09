@@ -10,4 +10,4 @@ install:
 
 script:
     - python pull-stats.py
-    - python analyze-games.py --dataset sample-data
+    - python analyze-games.py --dataset sample-data --skip-save-to-mongodb
