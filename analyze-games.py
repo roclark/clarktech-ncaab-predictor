@@ -258,7 +258,9 @@ def parse_boxscores(predictor):
     prediction_stats = []
 
     stdev_dict = find_stdev_for_every_stat()
-    for game in Boxscores(datetime.today()).games['boxscores']:
+    today = datetime.today()
+    today_string = '%s-%s-%s' % (today.month, today.day, today.year)
+    for game in Boxscores(today).games[today_string]:
         # Skip the games that are not between two DI teams since stats are not
         # saved for those teams.
         if game['non_di']:
@@ -269,9 +271,14 @@ def parse_boxscores(predictor):
                               [game['home_abbr'], game['away_abbr']]])
             match_stats = get_match_stats(game, stdev_dict)
             prediction_stats.append(match_stats)
-            g = MatchInfo(game['away_name'], game['home_name'],
-                          game['away_abbr'], game['home_abbr'],
-                          False, None, match_stats)
+            home_name = game['home_name']
+            away_name = game['away_name']
+            if game['home_rank']:
+                home_name = '(%s) %s' % (game['home_rank'], home_name)
+            if game['away_rank']:
+                away_name = '(%s) %s' % (game['away_rank'], away_name)
+            g = MatchInfo(away_name, home_name, game['away_abbr'],
+                          game['home_abbr'], game['top_25'], None, match_stats)
             match_info.append(g)
     predictions = make_predictions(prediction_stats, games_list, match_info,
                                    predictor)
