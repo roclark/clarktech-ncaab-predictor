@@ -3,27 +3,14 @@ import itertools
 import numpy
 import pandas as pd
 import random
-import re
-import requests
-from bs4 import BeautifulSoup
-from conferences import CONFERENCES
-from common import (differential_vector,
-                    find_name_from_nickname,
-                    find_nickname_from_name,
-                    make_request)
-from constants import YEAR
+from common import differential_vector
 from datetime import datetime
 from predictor import Predictor
-from requests import Session
-from teams import TEAMS
+from sportsreference.ncaab.teams import Teams
+from sportsreference.ncaab.schedule import Schedule
 
 
-AWAY = 1
-HOME = 0
 NUM_SIMS = 200
-TEAM_NAME_REGEX = 'schools/.*?/%s.html' % YEAR
-SCHEDULE = 'http://www.sports-reference.com/cbb/schools/%s/%s-schedule.html'
-SCORES_PAGE = 'http://www.sports-reference.com/cbb/boxscores/index.cgi?month='
 
 
 def read_team_stats_file(team_filename):
@@ -69,11 +56,19 @@ def get_totals(games_list, predictions, team_wins, conference_wins):
     return team_wins
 
 
-def teams_list(conference):
+def teams_list(conference, with_names=False):
+    teams = []
+    names = {}
     if not conference:
-        teams = TEAMS.values()
+        for team in Teams():
+            teams.append(team.abbreviation)
+            names[team.abbreviation] = team.name
     else:
-        teams = CONFERENCES[conference]
+        for abbreviation, name in conference['teams'].items():
+            teams.append(abbreviation)
+            names[abbreviation] = name
+    if with_names:
+        return teams, names
     return teams
 
 
@@ -121,11 +116,13 @@ def create_variance(stats_dict, stdev_dict):
 def initialize_standings_dict(conference):
     standings_dict = {}
     overall_standings_dict = {}
-    teams = teams_list(conference)
+    teams, names = teams_list(conference, with_names=True)
 
     for team in teams:
-        team = find_name_from_nickname(team)
-        overall_standings_dict[team] = [0] * len(teams)
+        overall_standings_dict[team] = {
+            'name': names[team],
+            'points': [0] * len(teams)
+        }
     return overall_standings_dict
 
 
@@ -143,7 +140,7 @@ def print_simulation_results(standings_dict, num_sims):
         print '=' * 80
         probabilities = {}
         for team, standings in standings_dict.items():
-            probability = float(standings[i]) / float(num_sims)
+            probability = float(standings['points'][i]) / float(num_sims)
             probabilities[team] = probability
         print_probabilities_ordered(probabilities)
 
@@ -170,50 +167,35 @@ def predict_all_simulations(predictor, stats_dict, stdev_dict, conference,
         rankings = print_rankings(team_wins)
         for rank in range(len(rankings)):
             for team in rankings[rank]:
-                standings_dict[team][rank] = standings_dict[team][rank] + 1
+                standings_dict[team]['points'][rank] += 1
     print_simulation_results(standings_dict, num_sims)
     return standings_dict, points_dict
 
 
-def get_conference_wins(team_soup):
-    for div in team_soup.find_all('div'):
-        wins = re.findall('<strong>Conference:</strong> \d+', str(div))
-        if len(wins) > 0:
-            return re.sub('.* ', '', wins[0])
+def get_conference_wins(team):
+    stats = read_team_stats_file('team-stats/%s' % team)
+    return int(stats['wins_conf'])
 
 
 def get_remaining_schedule(conference):
-    session = Session()
-    session.trust_env = False
     # remaining_schedule is a list of lists with the inner list being
     # the home first, followed by the away team (ie. [home, away])
     remaining_schedule = []
     current_records = {}
+    conference_name_short = conference['name'].replace(' Conference', '')
 
     for team in teams_list(conference):
-        schedule = make_request(session, SCHEDULE % (team, YEAR))
-        if not schedule:
-            continue
-        team_soup = BeautifulSoup(schedule.text, 'lxml')
-        conference_wins = get_conference_wins(team_soup)
-        current_records[team] = int(conference_wins)
-        games = team_soup.find_all('table', {'class': 'sortable stats_table'})
-        for game in games[-1].tbody.find_all('tr'):
-            # Skip games that have already been played
-            if game.find('a') and 'boxscores' in str(game.a):
-                continue
-            # Skip non-conference games
-            if conference not in str(game):
-                continue
-            opponent = re.findall('schools/.*?/%s.html' % YEAR, str(game))
-            opponent = re.sub('schools/', '', opponent[0])
-            opponent = re.sub('/.*', '', opponent)
-            location = game.find('td', {'class': 'left',
-                                        'data-stat': 'game_location'})
-            if location.get_text() == '@':
-                remaining_schedule.append([opponent, team])
-            else:
-                remaining_schedule.append([team, opponent])
+        schedule = Schedule(team)
+        conference_wins = get_conference_wins(team)
+        current_records[team] = conference_wins
+        for game in schedule:
+            # Find all conference matchups that the team hasn't played yet.
+            if game.opponent_abbr in teams_list(conference) and \
+               not game.points_for:
+                if game.location == 'AWAY':
+                    remaining_schedule.append([game.opponent_abbr, team])
+                else:
+                    remaining_schedule.append([team, game.opponent_abbr])
     remaining_schedule.sort()
     # Return a list of non-duplicate matches
     schedule = list(s for s, _ in itertools.groupby(remaining_schedule))
@@ -246,7 +228,6 @@ def print_rankings(team_wins):
     previous_wins = None
     for i in range(len(sorted_ranks)):
         wins, team = sorted_ranks[i]
-        team = find_name_from_nickname(team)
         if previous_wins != wins:
             rank = i + 1
         print '%s. %s: %s (rank %s)' % (str(i+1).rjust(3), team, wins, rank)
@@ -278,7 +259,7 @@ def start_simulations(predictor, conference, num_sims=NUM_SIMS):
                                                      stdev_dict, conference,
                                                      num_sims, schedule,
                                                      conference_wins)
-    return team_wins, points_dict, num_sims
+    return team_wins, points_dict
 
 
 def main():

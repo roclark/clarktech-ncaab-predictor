@@ -1,5 +1,4 @@
 import json
-from common import find_nickname_from_name
 from mascots import MASCOTS
 
 
@@ -8,21 +7,31 @@ class Simulation:
         conferences_list = []
         for conference, standings in results_dict.items():
             teams_list = []
-            for name, standings in standings.items():
-                nickname = find_nickname_from_name(name)
-                points = points_dict[conference][nickname]
+            conf_name = standings['name']
+            for nickname, standings in standings['results'].items():
+                position = standings['points'].index(max(standings['points']))
+                win_prob = float(standings['points'][0]) / float(num_sims)
+                seed_prob = float(standings['points'][position]) / \
+                            float(num_sims)
+                points = points_dict[conference]['points'][nickname]
+                name = standings['name']
                 mascot = MASCOTS[nickname]
                 team_dict = {
                     "name": name,
-                    "nickname": nickname,
+                    "abbreviation": nickname,
                     "mascot": mascot,
-                    "standings": standings,
-                    "points": float(points) / float(num_sims),
+                    "standings": standings['points'],
+                    "projectedWins": float(points) / float(num_sims),
+                    "seedProbability": seed_prob,
+                    "winProbability": win_prob
                 }
                 teams_list.append(team_dict)
-            conferences_list.append({conference: teams_list})
+            conferences_list.append({'teams': teams_list,
+                                     'conferenceAbbreviation': conference,
+                                     'conferenceName': conf_name,
+                                     'latest': True,
+                                     'num_sims': num_sims})
         self.simulation = {
-            "num_sims": num_sims,
             "conferences": conferences_list
         }
 

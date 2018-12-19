@@ -1,8 +1,8 @@
 import os
 from predictor import Predictor
-from conferences import CONFERENCES
 from monte_carlo_simulation import start_simulations, NUM_SIMS
 from save_json import Simulation, save_simulation
+from sportsreference.ncaab.conferences import Conferences
 
 
 def main():
@@ -10,10 +10,12 @@ def main():
     results_dict = {}
     points_dict = {}
 
-    for conference in CONFERENCES:
-        results, points, num_sims = start_simulations(predictor, conference)
-        results_dict[conference] = results
-        points_dict[conference] = points
+    for abbreviation, details in Conferences().conferences.items():
+        results, points = start_simulations(predictor, details)
+        results_dict[abbreviation] = {'results': results,
+                                      'name': details['name']}
+        points_dict[abbreviation] = {'points': points,
+                                     'name': details['name']}
     save_simulation(NUM_SIMS, results_dict, points_dict, 'simulations/simulation.json')
 
 
