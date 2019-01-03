@@ -49,6 +49,7 @@ def save_simulation(num_sims, results_dict, points_dict, output_file):
     simulation = Simulation(num_sims, results_dict, points_dict).__dict__
     with open(output_file, 'w') as fp:
         json.dump(simulation, fp)
+    return simulation
 
 
 def save_json(json_data, output_file):
