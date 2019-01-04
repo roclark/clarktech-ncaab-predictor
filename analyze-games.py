@@ -18,7 +18,7 @@ from pymongo import MongoClient
 from save_json import save_predictions_json
 from sportsreference.ncaab.boxscore import Boxscores
 from sportsreference.ncaab.conferences import Conferences
-from teams import TEAMS, TEAMS_INVERTED
+from teams import TEAMS
 
 
 AWAY = 0
@@ -109,6 +109,12 @@ def create_prediction_data(match_data, inverted_conferences, winner, loser,
     tags.append(inverted_conferences[match_data.home_nickname])
     tags.append(inverted_conferences[match_data.away_nickname])
     tags = list(set(tags))
+    if winner == match_data.home_nickname:
+        winner_name = match_data.home
+        loser_name = match_data.away
+    else:
+        winner_name = match_data.away
+        loser_name = match_data.home
     prediction = {
         'latest': True,
         'homeName': match_data.home,
@@ -118,10 +124,10 @@ def create_prediction_data(match_data, inverted_conferences, winner, loser,
         'awayAbbreviation': match_data.away_nickname,
         'awayMascot': MASCOTS[match_data.away_nickname],
         'time': match_data.game_time,
-        'predictedWinner': TEAMS_INVERTED[winner],
+        'predictedWinner': winner_name,
         'predictedWinnerAbbreviation': winner,
         'predictedWinnerMascot': MASCOTS[winner],
-        'predictedLoser': TEAMS_INVERTED[loser],
+        'predictedLoser': loser_name,
         'predictedLoserAbbreviation': loser,
         'predictedLoserMascot': MASCOTS[loser],
         'winnerPoints': winner_points,
