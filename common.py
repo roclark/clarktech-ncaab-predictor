@@ -98,11 +98,6 @@ def filter_stats(match_stats):
 def differential_vector(stats):
     for home_feature, away_feature in FIELDS_TO_COMBINE.items():
         try:
-            # Rename the points since they are used as the y coordinates
-            # for the regressor.
-            if home_feature == 'pts':
-                stats['pts_diff'] = stats['pts'] - stats['opp_pts']
-                continue
             feature = home_feature.replace('home_', '')
             stats[feature] = stats[home_feature] - stats[away_feature]
             stats.drop(away_feature, 1, inplace=True)
@@ -113,10 +108,16 @@ def differential_vector(stats):
 
 
 def convert_team_totals_to_averages(stats):
-    fields_to_average = ['mp', 'fg', 'fga', 'fg2', 'fg2a', 'fg3', 'fg3a', 'ft',
-                         'fta', 'orb', 'drb', 'trb', 'ast', 'stl', 'blk', 'tov',
-                         'pf', 'pts']
-    num_games = stats['g']
+    fields_to_average = ['assists', 'blocks', 'defensive_rebounds',
+                         'field_goal_attempts', 'field_goals',
+                         'free_throw_attempts', 'free_throws',
+                         'minutes_played', 'offensive_rebounds',
+                         'personal_fouls', 'points', 'steals',
+                         'three_point_field_goal_attempts',
+                         'three_point_field_goals', 'total_rebounds',
+                         'turnovers', 'two_point_field_goal_attempts',
+                         'two_point_field_goals']
+    num_games = stats['games_played']
     new_stats = stats.copy()
 
     for field in fields_to_average:
@@ -132,9 +133,13 @@ def extract_stats_components(stats, away=False):
     stats = stats[filtered_columns]
     stats = convert_team_totals_to_averages(stats)
     if away:
-        # Prepend all stats with 'opp_' to signify the away team as such.
-        away_columns = ['opp_%s' % col for col in stats]
+        # Prepend all stats with 'away_' to signify the away team as such.
+        away_columns = ['away_%s' % col for col in stats]
         stats.columns = away_columns
+    else:
+        # Prepend all stats with 'home_' to signify the home team as such.
+        home_columns = ['home_%s' % col for col in stats]
+        stats.columns = home_columns
     return stats
 
 

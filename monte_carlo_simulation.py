@@ -3,44 +3,17 @@ import itertools
 import numpy
 import pandas as pd
 import random
-from common import differential_vector
+from common import (differential_vector,
+                    extract_stats_components,
+                    read_team_stats_file)
 from datetime import datetime
 from predictor import Predictor
 from sportsreference.ncaab.teams import Teams
 from sportsreference.ncaab.schedule import Schedule
 
 
-NUM_SIMS = 200
-
-
-def read_team_stats_file(team_filename):
-    return pd.read_pickle(team_filename)
-
-
-def convert_team_totals_to_averages(stats):
-    fields_to_average = ['mp', 'fg', 'fga', 'fg2', 'fg2a', 'fg3', 'fg3a', 'ft',
-                         'fta', 'orb', 'drb', 'trb', 'ast', 'stl', 'blk', 'tov',
-                         'pf']
-    num_games = stats['g']
-    new_stats = stats.copy()
-
-    for field in fields_to_average:
-        new_value = float(stats[field]) / num_games
-        new_stats.loc[:,field] = new_value
-    return new_stats
-
-
-def extract_stats_components(stats, away=False):
-    # Get all of the stats that don't start with 'opp', AKA all of the
-    # stats that are directly related to the indicated team.
-    filtered_columns = [col for col in stats if not str(col).startswith('opp')]
-    stats = stats[filtered_columns]
-    stats = convert_team_totals_to_averages(stats)
-    if away:
-        # Prepend all stats with 'opp_' to signify the away team as such.
-        away_columns = ['opp_%s' % col for col in stats]
-        stats.columns = away_columns
-    return stats
+FIELDS_TO_DROP = ['abbreviation', 'conference', 'name']
+NUM_SIMS = 100
 
 
 def get_winner(game, prediction):
@@ -61,7 +34,7 @@ def teams_list(conference, with_names=False):
     names = {}
     if not conference:
         for team in Teams():
-            teams.append(team.abbreviation)
+            teams.append({team.abbreviation: team})
             names[team.abbreviation] = team.name
     else:
         for abbreviation, name in conference['teams'].items():
@@ -74,8 +47,6 @@ def teams_list(conference, with_names=False):
 
 def predict_all_matches(predictor, stats_dict, conference, schedule,
                         conference_wins):
-    fields_to_rename = {'win_loss_pct': 'win_pct',
-                        'opp_win_loss_pct': 'opp_win_pct'}
     games_list = []
     prediction_stats = pd.DataFrame()
     match_stats = []
@@ -91,7 +62,8 @@ def predict_all_matches(predictor, stats_dict, conference, schedule,
         match_stats.append(pd.concat([away_stats, home_stats], axis=1))
     prediction_stats = pd.concat(match_stats)
     match_vector = differential_vector(prediction_stats)
-    match_vector.rename(columns=fields_to_rename, inplace=True)
+    match_vector['points_difference'] = match_vector['home_points'] - \
+        match_vector['away_points']
     match_stats_simplified = predictor.simplify(match_vector)
     predictions = predictor.predict(match_stats_simplified, int)
     team_wins = get_totals(schedule, predictions, team_wins, conference_wins)
@@ -173,8 +145,8 @@ def predict_all_simulations(predictor, stats_dict, stdev_dict, conference,
 
 
 def get_conference_wins(team):
-    stats = read_team_stats_file('team-stats/%s.pkl' % team)
-    return int(stats['wins_conf'])
+    stats = read_team_stats_file('team-stats/%s' % team)
+    return int(stats['conference_wins'])
 
 
 def get_remaining_schedule(conference):
@@ -202,6 +174,22 @@ def get_remaining_schedule(conference):
     return schedule, current_records
 
 
+def drop_stats(home_stats, away_stats):
+    for field in FIELDS_TO_DROP:
+        home_stats.drop('home_%s' % field, 1, inplace=True)
+        away_stats.drop('away_%s' % field, 1, inplace=True)
+    return home_stats, away_stats
+
+
+def update_stats(stats):
+    if 'defensive_rating' not in stats and \
+       'offensive_rating' in stats and \
+       'net_rating' in stats:
+        stats['defensive_rating'] = stats['offensive_rating'] - \
+            stats['net_rating']
+    return stats
+
+
 def create_stats_dictionary(conference):
     stats_dict = {}
     stdev_dict = {}
@@ -209,13 +197,15 @@ def create_stats_dictionary(conference):
 
     for team in teams_list(conference):
         stats = read_team_stats_file('team-stats/%s' % team)
+        stats = update_stats(stats)
         home_stats = extract_stats_components(stats)
         away_stats = extract_stats_components(stats, away=True)
+        home_stats, away_stats = drop_stats(home_stats, away_stats)
         stats_dict[team] = home_stats
         stats_dict['%s_away' % team] = away_stats
         combined_stats = combined_stats.append(home_stats)
         combined_stats = combined_stats.append(away_stats)
-    for col in combined_stats:
+    for col in combined_stats.columns.values:
         stdev_dict[col] = combined_stats[col].std()
     return stats_dict, stdev_dict
 

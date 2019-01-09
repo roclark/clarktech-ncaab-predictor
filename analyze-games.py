@@ -4,7 +4,8 @@ import os
 import pandas as pd
 import random
 import re
-from common import (differential_vector,
+from common import (convert_team_totals_to_averages,
+                    differential_vector,
                     extract_stats_components,
                     read_team_stats_file)
 from constants import YEAR
@@ -21,7 +22,6 @@ from sportsreference.ncaab.teams import Teams
 AWAY = 0
 HOME = 1
 NUM_SIMS = 100
-FIELDS_TO_RENAME = {'win_loss_pct': 'win_pct'}
 FIELDS_TO_DROP = ['abbreviation', 'conference', 'name']
 
 
@@ -81,42 +81,6 @@ def save_predictions(predictions, skip_save_to_mongodb):
 
 def display_prediction(matchup, result):
     print '%s => %s' % (matchup, result)
-
-
-def convert_team_totals_to_averages(stats):
-    fields_to_average = ['assists', 'blocks', 'defensive_rebounds',
-                         'field_goal_attempts', 'field_goals',
-                         'free_throw_attempts', 'free_throws',
-                         'minutes_played', 'offensive_rebounds',
-                         'personal_fouls', 'points', 'steals',
-                         'three_point_field_goal_attempts',
-                         'three_point_field_goals', 'total_rebounds',
-                         'turnovers', 'two_point_field_goal_attempts',
-                         'two_point_field_goals']
-    num_games = stats['games_played']
-    new_stats = stats.copy()
-
-    for field in fields_to_average:
-        new_value = float(stats[field]) / num_games
-        new_stats.loc[:,field] = new_value
-    return new_stats
-
-
-def extract_stats_components(stats, away=False):
-    # Get all of the stats that don't start with 'opp', AKA all of the
-    # stats that are directly related to the indicated team.
-    filtered_columns = [col for col in stats if not str(col).startswith('opp')]
-    stats = stats[filtered_columns]
-    stats = convert_team_totals_to_averages(stats)
-    if away:
-        # Prepend all stats with 'away_' to signify the away team as such.
-        away_columns = ['away_%s' % col for col in stats]
-        stats.columns = away_columns
-    else:
-        # Prepend all stats with 'home_' to signify the home team as such.
-        home_columns = ['home_%s' % col for col in stats]
-        stats.columns = home_columns
-    return stats
 
 
 def create_prediction_data(match_data, inverted_conferences, winner, loser,
@@ -253,7 +217,6 @@ def make_predictions(prediction_stats, games_list, match_info, predictor):
     prediction_data = differential_vector(prediction_data)
     prediction_data['points_difference'] = prediction_data['home_points'] - \
         prediction_data['away_points']
-    prediction_data.rename(columns=FIELDS_TO_RENAME, inplace=True)
     prediction_data = predictor.simplify(prediction_data)
     predictions = predictor.predict(prediction_data, int)
     for sim in range(len(games_list) / NUM_SIMS):
