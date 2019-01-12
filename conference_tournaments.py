@@ -364,60 +364,55 @@ BRACKETS = {"America East Conference": {
 },
 "Big Sky Conference": {
     "A": {
-        "top_team": 9,
-        "bottom_team": 8,
+        "top_team": 8,
+        "bottom_team": 9,
         "winner": None
     },
     "B": {
-        "top_team": 12,
-        "bottom_team": 5,
+        "top_team": 7,
+        "bottom_team": 10,
         "winner": None
     },
     "C": {
-        "top_team": 10,
-        "bottom_team": 7,
+        "top_team": 6,
+        "bottom_team": 11,
         "winner": None
     },
     "D": {
-        "top_team": 11,
-        "bottom_team": 6,
+        "top_team": 1,
+        "bottom_team": "A",
         "winner": None
     },
     "E": {
-        "top_team": "A",
-        "bottom_team": 1,
+        "top_team": 4,
+        "bottom_team": 5,
         "winner": None
     },
     "F": {
-        "top_team": "B",
-        "bottom_team": 4,
+        "top_team": 2,
+        "bottom_team": "B",
         "winner": None
     },
     "G": {
-        "top_team": "C",
-        "bottom_team": 2,
+        "top_team": 3,
+        "bottom_team": "C",
         "winner": None
     },
     "H": {
         "top_team": "D",
-        "bottom_team": 3,
+        "bottom_team": "E",
         "winner": None
     },
     "I": {
-        "top_team": "E",
-        "bottom_team": "F",
+        "top_team": "F",
+        "bottom_team": "G",
         "winner": None
     },
     "J": {
-        "top_team": "G",
-        "bottom_team": "H",
+        "top_team": "H",
+        "bottom_team": "I",
         "winner": None
-    },
-    "K": {
-        "top_team": "I",
-        "bottom_team": "J",
-        "winner": None
-    },
+    }
 },
 "Big South Conference": {
     "A": {

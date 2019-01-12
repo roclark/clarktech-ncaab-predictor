@@ -1,1 +1,8 @@
 *.py[c|o]
+bin/
+etc/
+include/
+lib/
+*.ipynb
+pip-selfcheck.json
+share/

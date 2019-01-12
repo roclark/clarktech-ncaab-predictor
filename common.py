@@ -1,8 +1,10 @@
 import difflib
 import numpy
 import pandas as pd
+import random
 import re
 import requests
+from pymongo import MongoClient
 
 
 FIELDS_TO_COMBINE = {
@@ -47,38 +49,25 @@ FIELDS_TO_COMBINE = {
     'home_wins': 'away_wins',
     'pace': 'pace',
 }
+FIELDS_TO_DROP = ['abbreviation', 'conference', 'name']
+
+
+class MatchInfo:
+    def __init__(self, away, home, away_name, home_name, away_abbreviation,
+                 home_abbreviation, top_25, game_time):
+        self.away = away
+        self.away_abbreviation = away_abbreviation
+        self.away_name = away_name
+        self.game_time = game_time
+        self.home = home
+        self.home_abbreviation = home_abbreviation
+        self.home_name = home_name
+        self.top_25 = top_25
 
 
 def read_team_stats_file(team_filename):
     team_filename = re.sub('\(\d+\) +', '', team_filename)
     return pd.read_pickle('%s.plk' % team_filename)
-
-
-def make_request(session, url):
-    # Try a URL 3 times. If it still doesn't work, just skip the entry.
-    for i in xrange(3):
-        try:
-            response = session.get(url)
-            return response
-        except requests.exceptions.ConnectionError:
-            continue
-    return None
-
-
-def include_wins_and_losses(stats, wins, losses, away=False):
-    wins = float(wins)
-    losses = float(losses)
-    win_percentage = float(wins / (wins + losses))
-
-    if away:
-        stats['opp_wins'] = wins
-        stats['opp_losses'] = losses
-        stats['opp_win_pct'] = win_percentage
-    else:
-        stats['wins'] = wins
-        stats['losses'] = losses
-        stats['win_pct'] = win_percentage
-    return stats
 
 
 def filter_stats(match_stats):
@@ -145,21 +134,199 @@ def extract_stats_components(stats, away=False):
     return stats
 
 
-def find_name_from_nickname(nickname):
-    from teams import TEAMS
+def find_stdev_for_every_stat(teams, rankings):
+    stats_dict = {}
+    stdev_dict = {}
+    combined_stats = pd.DataFrame()
 
-    nickname = difflib.get_close_matches(nickname, TEAMS.values())[0]
-    for key, value in TEAMS.items():
-        if value == nickname:
-            return key
+    for team in teams:
+        abbr = team.abbreviation.lower()
+        stats = update_stats(team.dataframe, abbr, rankings)
+        home_stats = extract_stats_components(stats)
+        away_stats = extract_stats_components(stats, away=True)
+        home_stats, away_stats = drop_stats(home_stats, away_stats)
+        stats_dict[abbr] = home_stats
+        stats_dict['%s_away' % abbr] = away_stats
+        combined_stats = combined_stats.append(home_stats)
+        combined_stats = combined_stats.append(away_stats)
+    for col in combined_stats.columns.values:
+        stdev_dict[col] = combined_stats[col].std()
+    return stats_dict, stdev_dict
 
 
-def find_nickname_from_name(name):
-    from teams import TEAMS
+def drop_stats(home_stats, away_stats):
+    for field in FIELDS_TO_DROP:
+        home_stats.drop('home_%s' % field, 1, inplace=True)
+        away_stats.drop('away_%s' % field, 1, inplace=True)
+    return home_stats, away_stats
 
-    try:
-        nickname = TEAMS[name]
-    except KeyError:
-        name = difflib.get_close_matches(name, TEAMS.keys())[0]
-        nickname = TEAMS[name]
-    return nickname
+
+def update_stats(stats, abbreviation, rankings):
+    defensive_rebound_percentage = 100.0 * stats['defensive_rebounds'] /\
+        (stats['defensive_rebounds'] + stats['opp_offensive_rebounds'])
+    stats['defensive_rebound_percentage'] = defensive_rebound_percentage
+    if 'defensive_rating' not in stats and \
+       'offensive_rating' in stats and \
+       'net_rating' in stats:
+        stats['defensive_rating'] = stats['offensive_rating'] - \
+            stats['net_rating']
+    if abbreviation.lower() in rankings.keys():
+        stats['ranking'] = rankings[abbreviation.lower()]
+    else:
+        stats['ranking'] = 0
+    return stats
+
+
+def create_variance(stats, stdev_dict, away, location_specified=False):
+    local_stats = {}
+
+    for stat in stats:
+        if stat.startswith('opp_'):
+            continue
+        if location_specified:
+            min_val = -1 * float(stdev_dict[stat])
+        elif away:
+            min_val = -1 * float(stdev_dict['away_%s' % stat])
+        else:
+            min_val = -1 * float(stdev_dict['home_%s' % stat])
+        max_val = abs(min_val)
+        variance = random.uniform(min_val, max_val)
+        new_value = float(stats[stat]) + variance
+        local_stats[stat] = new_value
+    return pd.DataFrame([local_stats])
+
+
+def create_predictions(prediction_stats, predictor):
+    prediction_data = pd.concat(prediction_stats)
+    matches_vector = differential_vector(prediction_data)
+    matches_vector['points_difference'] = matches_vector['home_points'] - \
+        matches_vector['away_points']
+    matches_vector = predictor.simplify(matches_vector)
+    return predictor.predict(matches_vector, int)
+
+
+def add_winner(num_wins, home, away, home_score, away_score):
+    if away_score > home_score:
+        num_wins[away] = num_wins.get(away, 0) + 1
+    # In the case of a tie, give precedence to the home team.
+    else:
+        num_wins[home] = num_wins.get(home, 0) + 1
+    return num_wins
+
+
+def add_points(total_points, home, away, home_score, away_score):
+    total_points[home] = total_points.get(home, 0) + home_score
+    total_points[away] = total_points.get(away, 0) + away_score
+    return total_points
+
+
+def accumulate_points_and_wins(total_points, num_wins, prediction, game):
+    home, away = game
+    home_score, away_score = prediction
+    total_points = add_points(total_points, home, away, home_score, away_score)
+    num_wins = add_winner(num_wins, home, away, home_score, away_score)
+    return total_points, num_wins
+
+
+def update_total_wins(standings, total_wins):
+    for team, points in standings.items():
+        total_wins[team] = total_wins.get(team, 0) + points
+    return total_wins
+
+
+def update_standings(standings, standings_dict):
+    sorted_standings = [(v,k) for k,v in standings.iteritems()]
+    sorted_standings.sort(reverse=True)
+    for position, standings in enumerate(sorted_standings):
+        _, team = standings
+        standings_dict[team]['points'][position] += 1
+    return standings_dict
+
+
+def determine_conference_standings(num_wins, conference_wins):
+    standings_dict = {}
+
+    for team in conference_wins:
+        standings_dict[team] = num_wins.get(team, 0) + \
+            conference_wins.get(team, 0)
+    return standings_dict
+
+
+def print_probabilities_ordered(probabilities):
+    sorted_ranks = [(v,k) for k,v in probabilities.iteritems()]
+    sorted_ranks.sort(reverse=True)
+    for probability, team in sorted_ranks:
+        print('%s: %s%%' % (team, probability * 100.0))
+
+
+def print_simulation_results(standings_dict, num_sims):
+    for i in range(len(standings_dict)):
+        print('=' * 80)
+        print('  Place: %s' % (i+1))
+        print('=' * 80)
+        probabilities = {}
+        for team, standings in standings_dict.items():
+            probability = float(standings['points'][i]) / float(num_sims)
+            probabilities[team] = probability
+        print_probabilities_ordered(probabilities)
+
+
+def determine_outcomes(predictions, games_list, standings_dict=None,
+                       conference_wins=None, num_sims=None):
+    total_points = {}
+    total_wins = {}
+    num_wins = {}
+
+    for i in range(len(games_list)):
+        total_points, num_wins = accumulate_points_and_wins(total_points,
+                                                            num_wins,
+                                                            predictions[i],
+                                                            games_list[i])
+        if not standings_dict:
+            continue
+        if (i + 1) % (len(games_list) / num_sims) == 0:
+            standings = determine_conference_standings(num_wins,
+                                                       conference_wins)
+            standings_dict = update_standings(standings, standings_dict)
+            total_wins = update_total_wins(standings, total_wins)
+            num_wins = {}
+        if (i + 1) == len(games_list):
+            print_simulation_results(standings_dict, num_sims)
+            return standings_dict, total_wins
+    return total_points, num_wins
+
+
+def aggregate_match_stats(stats_dict, stdev_dict, games, num_sims):
+    match_stats = []
+    new_games = []
+
+    for iteration in range(num_sims):
+        for game in games:
+            away = game.away_abbreviation
+            home = game.home_abbreviation
+            home_stats = create_variance(stats_dict[home],
+                                         stdev_dict, False, True)
+            away_stats = create_variance(stats_dict['%s_away' % away],
+                                         stdev_dict, True, True)
+            match_stats.append(pd.concat([away_stats, home_stats], axis=1))
+            new_games.append([home, away])
+    return match_stats, new_games
+
+
+def create_team_name(game):
+    home = game['home_name']
+    away = game['away_name']
+    if game['home_rank']:
+        home = '(%s) ' % game['home_rank'] + home
+    if game['away_rank']:
+        away = '(%s) ' % game['away_rank'] + away
+    return home, away
+
+
+def populate_game_info(teams, game):
+    home_name, away_name = create_team_name(game)
+    away = teams(game['away_abbr'])
+    home = teams(game['home_abbr'])
+    match = MatchInfo(away, home, away_name, home_name, game['away_abbr'],
+                      game['home_abbr'], game['top_25'], None)
+    return match

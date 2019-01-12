@@ -24,25 +24,6 @@ class Predictor:
         self._create_regressor()
         self._train_model()
 
-    @property
-    def accuracy(self):
-        predicted = self.predict(self._X_test, int)
-        accuracy = round(accuracy_score(self._y_test, predicted) * 100.0, 2)
-        print 'Accuracy: %s%%' % accuracy
-
-    def print_tree(self):
-        dot_data = StringIO()
-        i = 1
-        for tree_in_forest in self._model.estimators_:
-            dot_data = tree.export_graphviz(tree_in_forest,
-                                            out_file='tree_%s.dot' % str(i),
-                                            feature_names=self._filtered_features,
-                                            class_names=['away_win', 'home_win'],
-                                            filled=True,
-                                            rounded=True,
-                                            special_characters=True)
-            i += 1
-
     def simplify(self, test_data):
         test_data = test_data.loc[:, test_data.columns.isin(self._filtered_features)]
         test_data = test_data.reindex(self._filtered_features, axis=1)

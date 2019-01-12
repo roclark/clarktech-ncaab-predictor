@@ -45,14 +45,20 @@ def save_result(saved_data, game):
             prediction['actualHomeScore'] = game['home_score']
             prediction['actualAwayScore'] = game['away_score']
             prediction['accuratePick'] = correct
-            return saved_data
-    return saved_data
+            return saved_data, correct
+    return saved_data, None
 
 
 def parse_boxscore(games, saved_data):
+    num_games = 0
+    num_correct = 0
+
     for game in games:
-        saved_data = save_result(saved_data, game)
-    return saved_data
+        saved_data, correct = save_result(saved_data, game)
+        if correct:
+            num_correct += 1
+        num_games += 1
+    return saved_data, num_games, num_correct
 
 
 def get_date(filename):
@@ -66,12 +72,21 @@ def get_saved_prediction(filename):
 
 
 def iterate_files(files):
+    total_games = 0
+    total_correct = 0
+
     for filename in files:
         date = get_date(filename)
         saved_data = get_saved_prediction(filename)
         games = Boxscores(date).games[filename.replace('.json', '')]
-        saved_data = parse_boxscore(games, saved_data)
+        saved_data, num_games, num_correct = parse_boxscore(games, saved_data)
+        total_games += num_games
+        total_correct += num_correct
         save_json(saved_data, 'predictions/%s' % filename)
+    print('=' * 80)
+    print('  Accuracy: %s%%' % round(100.0 * float(total_correct) / \
+                                     float(total_games), 2))
+    print('=' * 80)
 
 
 def get_files():
