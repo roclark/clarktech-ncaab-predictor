@@ -8,6 +8,7 @@ from common import (differential_vector,
                     read_team_stats_file)
 from datetime import datetime
 from predictor import Predictor
+from sportsreference.constants import AWAY
 from sportsreference.ncaab.teams import Teams
 from sportsreference.ncaab.schedule import Schedule
 
@@ -164,7 +165,7 @@ def get_remaining_schedule(conference):
             # Find all conference matchups that the team hasn't played yet.
             if game.opponent_abbr in teams_list(conference) and \
                not game.points_for:
-                if game.location == 'AWAY':
+                if game.location == AWAY:
                     remaining_schedule.append([game.opponent_abbr, team])
                 else:
                     remaining_schedule.append([team, game.opponent_abbr])
