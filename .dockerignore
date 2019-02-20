@@ -1,0 +1,9 @@
+.git*
+.travis.yml
+sample-data
+*.csv
+*env*
+sample-data/
+matches/
+predictions/
+simulations/
