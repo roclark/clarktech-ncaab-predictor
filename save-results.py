@@ -1,85 +1,63 @@
 import json
-import re
-import requests
-from bs4 import BeautifulSoup
-from constants import YEAR
+from datetime import datetime
 from os import listdir
 from os.path import isfile, join
 from save_json import save_json
-
-
-SCORES_PAGE = 'http://www.sports-reference.com/cbb/boxscores/index.cgi?month='
-TEAM_NAME_REGEX = 'schools/.*?/%s.html' % YEAR
-
-
-def get_name(name):
-    try:
-        name = re.findall(TEAM_NAME_REGEX, str(name[0]))[0]
-        name = name.replace('schools/', '')
-        name = name.replace('/%s.html' % YEAR, '')
-    except IndexError:
-        return None
-    return name
-
-
-def find_teams(result):
-    winner = get_name(result.find_all('tr', {'class': 'winner'}))
-    loser = get_name(result.find_all('tr', {'class': 'loser'}))
-    if not winner or not loser:
-        return None, None
-    return winner, loser
+from sportsreference.ncaab.boxscore import Boxscores
 
 
 def corresponding_matchup(prediction, winner, loser):
-    if prediction['teams']['home']['nickname'] == winner and \
-       prediction['teams']['away']['nickname'] == loser:
+    if prediction['homeAbbreviation'] == winner and \
+       prediction['awayAbbreviation'] == loser:
         return True
-    elif prediction['teams']['home']['nickname'] == loser and \
-         prediction['teams']['away']['nickname'] == winner:
-        return True
-    return False
-
-
-def correct_pick(teams, winner):
-    if teams['winner']['nickname'] == winner:
+    elif prediction['homeAbbreviation'] == loser and \
+         prediction['awayAbbreviation'] == winner:
         return True
     return False
 
 
-def save_result(saved_data, winner, loser):
+def correct_pick(predicted_winner, actual_winner):
+    if predicted_winner == actual_winner:
+        return True
+    return False
+
+
+def get_mascots(winner, loser, prediction):
+    if winner == prediction['homeAbbreviation']:
+        return prediction['homeMascot'], prediction['awayMascot']
+    return prediction['awayMascot'], prediction['homeMascot']
+
+
+def save_result(saved_data, game):
+    winner, loser = game['winning_abbr'], game['losing_abbr']
     for prediction in saved_data['predictions']:
-        if corresponding_matchup(prediction['prediction'], winner, loser):
-            correct = correct_pick(prediction['prediction']['prediction'],
+        if corresponding_matchup(prediction, winner, loser):
+            correct = correct_pick(prediction['predictedWinnerAbbreviation'],
                                    winner)
-            prediction['prediction']['results'] = {'winner': winner,
-                                                   'loser': loser,
-                                                   'correct': correct}
-            return saved_data, correct
-    return saved_data, None
-
-
-def parse_boxscore(boxscore, saved_data):
-    results = boxscore.find_all('tbody')
-    num_games = 0
-    num_correct = 0
-    for result in results:
-        winner, loser = find_teams(result)
-        if not winner or not loser:
-            continue
-        saved_data, correct = save_result(saved_data, winner, loser)
-        if correct:
-            num_correct += 1
-        num_games += 1
-    if num_games > 0:
-        accuracy = 100.0 * float(num_correct) / float(num_games)
-        saved_data['accuracy'] = accuracy
+            winning_mascot, losing_mascot = get_mascots(winner, loser,
+                                                        prediction)
+            prediction['actualWinner'] = game['winning_name']
+            prediction['actualWinnerAbbreviation'] = game['winning_abbr']
+            prediction['actualWinnerMascot'] = winning_mascot
+            prediction['actualLoser'] = game['losing_name']
+            prediction['actualLoserAbbreviation'] = game['losing_abbr']
+            prediction['actualLoserMascot'] = losing_mascot
+            prediction['actualHomeScore'] = game['home_score']
+            prediction['actualAwayScore'] = game['away_score']
+            prediction['accuratePick'] = correct
+            return saved_data
     return saved_data
 
 
-def get_url(filename):
+def parse_boxscore(games, saved_data):
+    for game in games:
+        saved_data = save_result(saved_data, game)
+    return saved_data
+
+
+def get_date(filename):
     month, day, year = filename.replace('.json', '').split('-')
-    url = '%s%s&day=%s&year=%s' % (SCORES_PAGE, month.rjust(2, '0'), day, year)
-    return url
+    return datetime(int(year), int(month), int(day))
 
 
 def get_saved_prediction(filename):
@@ -89,11 +67,10 @@ def get_saved_prediction(filename):
 
 def iterate_files(files):
     for filename in files:
-        url = get_url(filename)
+        date = get_date(filename)
         saved_data = get_saved_prediction(filename)
-        boxscores = requests.get(url)
-        saved_data = parse_boxscore(BeautifulSoup(boxscores.text, 'lxml'),
-                                    saved_data)
+        games = Boxscores(date).games[filename.replace('.json', '')]
+        saved_data = parse_boxscore(games, saved_data)
         save_json(saved_data, 'predictions/%s' % filename)
 
 
