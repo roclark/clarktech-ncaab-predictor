@@ -1,63 +1,26 @@
 import json
-import re
-import requests
-from bs4 import BeautifulSoup
 from datetime import datetime, timedelta
+from sportsreference.ncaab.boxscore import Boxscores
 
 
-SCORES_PAGE = 'http://www.sports-reference.com/cbb/boxscores/index.cgi?month='
-
-
-def retrieve_yesterdays_url():
+def retrieve_yesterdays_date():
     yesterday = datetime.now() - timedelta(days=1)
-    url = '%s%s&day=%s&year=%s' % (SCORES_PAGE,
-                                   yesterday.month,
-                                   yesterday.day,
-                                   yesterday.year)
-    return url
+    return '%s-%s-%s' % (yesterday.month, yesterday.day, yesterday.year)
 
 
-def parse_team(game):
-    team = re.sub('/\d+.html.*', '', str(game.a))
-    team = re.sub('.*/', '', team)
-    return team
-
-
-def find_result(game):
-    winner = parse_team(game.find('tr', {'class': 'winner'}))
-    loser = parse_team(game.find('tr', {'class': 'loser'}))
-    # When a team plays a non-DI opponent, the result is 'a>'. Since we don't
-    # predict non-DI games, we throw these results out.
-    if winner == 'a>' or loser == 'a>':
-        return None
-    return [winner, loser]
-
-
-def parse_boxscores(boxscore_html):
+def find_yesterdays_results():
     results = []
 
-    games_table = boxscore_html.find('div', {'class': 'game_summaries'})
-    games = games_table.find_all('tbody')
-    for game in games:
-        result = find_result(game)
-        if result:
-            results.append(result)
-    return results
-
-
-def find_yesterdays_games():
-    url = retrieve_yesterdays_url()
-    boxscores = requests.get(url)
-    boxscore_html = BeautifulSoup(boxscores.text, 'lxml')
-    results = parse_boxscores(boxscore_html)
+    games = Boxscores(datetime.now() - timedelta(days=1)).games
+    yesterday = retrieve_yesterdays_date()
+    for game in games[yesterday]:
+        results.append([game['winning_abbr'], game['losing_abbr']])
     return results
 
 
 def get_predictions_filename():
-    yesterday = datetime.now() - timedelta(days=1)
-    filename = 'predictions/%s-%s-%s.json' % (yesterday.month,
-                                              yesterday.day,
-                                              yesterday.year)
+    yesterday = retrieve_yesterdays_date()
+    filename = 'predictions/%s.json' % yesterday
     return filename
 
 
@@ -68,8 +31,8 @@ def open_json(filename):
 
 
 def get_result(prediction):
-    winner = str(prediction['prediction']['prediction']['winner']['nickname'])
-    loser = str(prediction['prediction']['prediction']['loser']['nickname'])
+    winner = str(prediction['predictedWinnerAbbreviation'])
+    loser = str(prediction['predictedLoserAbbreviation'])
     return [winner, loser]
 
 
@@ -91,13 +54,14 @@ def check_saved_predictions(results):
     for result in results:
         if result in predictions:
             correct += 1
-    print '='*80
-    print '  Accuracy: %s%%' % round(100.0 * float(correct) / float(matches), 2)
-    print '='*80
+    print('='*80)
+    print('  Accuracy: %s%%' % round(100.0 * float(correct) / \
+                                     float(matches), 2))
+    print('='*80)
 
 
 def main():
-    results = find_yesterdays_games()
+    results = find_yesterdays_results()
     check_saved_predictions(results)
 
 
