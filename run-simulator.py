@@ -303,8 +303,8 @@ def sort_by_simple_rating_system(stats_dict):
             continue
         simple_rating_system[team] = stats.iloc[0]['home_simple_rating_system']
 
-    for key, value in sorted(simple_rating_system.iteritems(),
-                             key=lambda (k,v): (v,k),
+    for key, value in sorted(simple_rating_system.items(),
+                             key=itemgetter(1),
                              reverse=True):
         sorted_ranks.append(key)
     return sorted_ranks
