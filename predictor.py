@@ -1,7 +1,9 @@
 import pandas as pd
 import numpy as np
+from build_dataset import DATASET_NAME
 from common import differential_vector, filter_stats
 from glob import glob
+from os import path
 from sklearn import tree
 from sklearn.externals.six import StringIO
 from sklearn.metrics import accuracy_score
@@ -42,6 +44,9 @@ class Predictor:
         return self._model.predict(test_data).astype(output_datatype)
 
     def _read_data(self, data_directory):
+        if path.exists(DATASET_NAME):
+            data = pd.read_pickle(DATASET_NAME)
+            return differential_vector(data)
         frames = [pd.read_pickle(match) for match in \
                   glob('%s/*/*' % data_directory)]
         data = pd.concat(frames)
