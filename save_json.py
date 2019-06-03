@@ -3,7 +3,7 @@ from mascots import MASCOTS
 
 
 class Simulation:
-    def __init__(self, num_sims, results_dict, points_dict):
+    def __init__(self, num_sims, results_dict, points_dict, teams):
         conferences_list = []
         for conference, standings in results_dict.items():
             teams_list = []
@@ -14,7 +14,7 @@ class Simulation:
                 seed_prob = float(standings['points'][position]) / \
                             float(num_sims)
                 points = points_dict[conference]['points'][nickname]
-                name = standings['name']
+                name = teams(nickname).name
                 mascot = MASCOTS[nickname]
                 team_dict = {
                     "name": name,
@@ -45,8 +45,9 @@ def save_predictions_json(predictions, output_file):
         json.dump(prediction_json, fp)
 
 
-def save_simulation(num_sims, results_dict, points_dict, output_file):
-    simulation = Simulation(num_sims, results_dict, points_dict).__dict__
+def save_simulation(num_sims, results_dict, points_dict, output_file, teams):
+    simulation = Simulation(num_sims, results_dict, points_dict,
+                            teams).__dict__
     with open(output_file, 'w') as fp:
         json.dump(simulation, fp)
     return simulation

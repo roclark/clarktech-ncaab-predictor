@@ -1,4 +1,4 @@
-BRACKETS = {"America East Conference": {
+BRACKETS = {"america-east": {
     "A": {
         "top_team": 1,
         "bottom_team": 8,
@@ -35,7 +35,7 @@ BRACKETS = {"America East Conference": {
         "winner": None
     },
 },
-"American Athletic Conference": {
+"aac": {
     "A": {
         "top_team": 9,
         "bottom_team": 8,
@@ -92,7 +92,7 @@ BRACKETS = {"America East Conference": {
         "winner": None
     },
 },
-"Atlantic 10 Conference": {
+"atlantic-10": {
     "A": {
         "top_team": 12,
         "bottom_team": 13,
@@ -159,7 +159,7 @@ BRACKETS = {"America East Conference": {
         "winner": None
     }
 },
-"Atlantic Coast Conference": {
+"acc": {
     "A": {
         "top_team": 12,
         "bottom_team": 13,
@@ -231,7 +231,7 @@ BRACKETS = {"America East Conference": {
         "winner": None
     },
 },
-"Atlantic Sun Conference": {
+"atlantic-sun": {
     "A": {
         "top_team": 1,
         "bottom_team": 8,
@@ -268,7 +268,7 @@ BRACKETS = {"America East Conference": {
         "winner": None
     },
 },
-"Big 12 Conference": {
+"big-12": {
     "A": {
         "top_team": 8,
         "bottom_team": 9,
@@ -315,7 +315,7 @@ BRACKETS = {"America East Conference": {
         "winner": None
     },
 },
-"Big East Conference": {
+"big-east": {
     "A": {
         "top_team": 8,
         "bottom_team": 9,
@@ -362,7 +362,7 @@ BRACKETS = {"America East Conference": {
         "winner": None
     },
 },
-"Big Sky Conference": {
+"big-sky": {
     "A": {
         "top_team": 8,
         "bottom_team": 9,
@@ -414,7 +414,7 @@ BRACKETS = {"America East Conference": {
         "winner": None
     }
 },
-"Big South Conference": {
+"big-south": {
     "A": {
         "top_team": 8,
         "bottom_team": 9,
@@ -461,7 +461,7 @@ BRACKETS = {"America East Conference": {
         "winner": None
     },
 },
-"Big Ten Conference": {
+"big-ten": {
     "A": {
         "top_team": 12,
         "bottom_team": 13,
@@ -528,7 +528,7 @@ BRACKETS = {"America East Conference": {
         "winner": None
     }
 },
-"Big West Conference": {
+"big-west": {
     "A": {
         "top_team": 1,
         "bottom_team": 8,
@@ -565,7 +565,7 @@ BRACKETS = {"America East Conference": {
         "winner": None
     },
 },
-"Colonial Athletic Association": {
+"colonial": {
     "A": {
         "top_team": 8,
         "bottom_team": 9,
@@ -612,7 +612,7 @@ BRACKETS = {"America East Conference": {
         "winner": None
     },
 },
-"Conference USA": {
+"cusa": {
     "A": {
         "top_team": 12,
         "bottom_team": 13,
@@ -679,7 +679,7 @@ BRACKETS = {"America East Conference": {
         "winner": None
     }
 },
-"Horizon League": {
+"horizon": {
     "A": {
         "top_team": 8,
         "bottom_team": 9,
@@ -726,7 +726,7 @@ BRACKETS = {"America East Conference": {
         "winner": None
     },
 },
-"Ivy Group": {
+"ivy": {
     "A": {
         "top_team": 1,
         "bottom_team": 4,
@@ -743,7 +743,7 @@ BRACKETS = {"America East Conference": {
         "winner": None
     }
 },
-"Metro Atlantic Athletic Conference": {
+"maac": {
     "A": {
         "top_team": 8,
         "bottom_team": 9,
@@ -795,7 +795,7 @@ BRACKETS = {"America East Conference": {
         "winner": None
     },
 },
-"Mid-American Conference": {
+"mac": {
     "A": {
         "top_team": 9,
         "bottom_team": 8,
@@ -852,7 +852,7 @@ BRACKETS = {"America East Conference": {
         "winner": None
     },
 },
-"Mid-Eastern Athletic Conference": {
+"meac": {
     "A": {
         "top_team": 9,
         "bottom_team": 8,
@@ -909,7 +909,7 @@ BRACKETS = {"America East Conference": {
         "winner": None
     },
 },
-"Missouri Valley Conference": {
+"mvc": {
     "A": {
         "top_team": 8,
         "bottom_team": 9,
@@ -956,7 +956,7 @@ BRACKETS = {"America East Conference": {
         "winner": None
     },
 },
-"Mountain West Conference": {
+"mwc": {
     "A": {
         "top_team": 8,
         "bottom_team": 9,
@@ -1008,7 +1008,7 @@ BRACKETS = {"America East Conference": {
         "winner": None
     },
 },
-"Northeast Conference": {
+"northeast": {
     "A": {
         "top_team": 1,
         "bottom_team": 8,
@@ -1045,7 +1045,7 @@ BRACKETS = {"America East Conference": {
         "winner": None
     },
 },
-"Ohio Valley Conference": {
+"ovc": {
     "A": {
         "top_team": 9,
         "bottom_team": 8,
@@ -1102,7 +1102,7 @@ BRACKETS = {"America East Conference": {
         "winner": None
     },
 },
-"Pacific-12 Conference": {
+"pac-12": {
     "A": {
         "top_team": 9,
         "bottom_team": 8,
@@ -1159,7 +1159,7 @@ BRACKETS = {"America East Conference": {
         "winner": None
     },
 },
-"Patriot League": {
+"patriot": {
     "A": {
         "top_team": 8,
         "bottom_team": 9,
@@ -1206,7 +1206,7 @@ BRACKETS = {"America East Conference": {
         "winner": None
     },
 },
-"Southeastern Conference": {
+"sec": {
     "A": {
         "top_team": 12,
         "bottom_team": 13,
@@ -1273,7 +1273,7 @@ BRACKETS = {"America East Conference": {
         "winner": None
     }
 },
-"Southern Conference": {
+"southern": {
     "A": {
         "top_team": 8,
         "bottom_team": 9,
@@ -1320,7 +1320,7 @@ BRACKETS = {"America East Conference": {
         "winner": None
     },
 },
-"Southland Conference": {
+"southland": {
     "A": {
         "top_team": 1,
         "bottom_team": 8,
@@ -1357,7 +1357,7 @@ BRACKETS = {"America East Conference": {
         "winner": None
     },
 },
-"Southwest Athletic Conference": {
+"swac": {
     "A": {
         "top_team": 1,
         "bottom_team": 8,
@@ -1394,7 +1394,7 @@ BRACKETS = {"America East Conference": {
         "winner": None
     },
 },
-"Summit League": {
+"summit": {
     "A": {
         "top_team": 1,
         "bottom_team": 8,
@@ -1431,7 +1431,7 @@ BRACKETS = {"America East Conference": {
         "winner": None
     },
 },
-"Sun Belt Conference": {
+"sun-belt": {
     "A": {
         "top_team": 9,
         "bottom_team": 8,
@@ -1488,7 +1488,7 @@ BRACKETS = {"America East Conference": {
         "winner": None
     },
 },
-"West Coast Conference": {
+"wcc": {
     "A": {
         "top_team": 8,
         "bottom_team": 9,
@@ -1535,7 +1535,7 @@ BRACKETS = {"America East Conference": {
         "winner": None
     },
 },
-"Western Athletic Conference": {
+"wac": {
     "A": {
         "top_team": 1,
         "bottom_team": 8,

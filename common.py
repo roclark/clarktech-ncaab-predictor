@@ -205,8 +205,8 @@ def create_predictions(prediction_stats, predictor):
     return predictor.predict(matches_vector, int)
 
 
-def add_winner(num_wins, home, away, home_score, away_score):
-    if away_score > home_score:
+def add_winner(num_wins, home, away, spread):
+    if spread < 0:
         num_wins[away] = num_wins.get(away, 0) + 1
     # In the case of a tie, give precedence to the home team.
     else:
@@ -214,17 +214,16 @@ def add_winner(num_wins, home, away, home_score, away_score):
     return num_wins
 
 
-def add_points(total_points, home, away, home_score, away_score):
-    total_points[home] = total_points.get(home, 0) + home_score
-    total_points[away] = total_points.get(away, 0) + away_score
+def add_points(total_points, home, away, spread):
+    total_points[home] = total_points.get(home, 0) + spread
+    total_points[away] = total_points.get(away, 0) - spread
     return total_points
 
 
-def accumulate_points_and_wins(total_points, num_wins, prediction, game):
+def accumulate_points_and_wins(total_points, num_wins, spread, game):
     home, away = game
-    home_score, away_score = prediction
-    total_points = add_points(total_points, home, away, home_score, away_score)
-    num_wins = add_winner(num_wins, home, away, home_score, away_score)
+    total_points = add_points(total_points, home, away, spread)
+    num_wins = add_winner(num_wins, home, away, spread)
     return total_points, num_wins
 
 
@@ -234,12 +233,12 @@ def update_total_wins(standings, total_wins):
     return total_wins
 
 
-def update_standings(standings, standings_dict):
-    sorted_standings = [(v,k) for k,v in standings.iteritems()]
+def update_standings(standings, standings_dict, num_sims=1):
+    sorted_standings = [(v,k) for k,v in standings.items()]
     sorted_standings.sort(reverse=True)
     for position, standings in enumerate(sorted_standings):
         _, team = standings
-        standings_dict[team]['points'][position] += 1
+        standings_dict[team]['points'][position] += num_sims
     return standings_dict
 
 
@@ -276,6 +275,12 @@ def determine_outcomes(predictions, games_list, standings_dict=None,
     total_points = {}
     total_wins = {}
     num_wins = {}
+
+    # Occurs when the season is already complete and no future games will
+    # be played in the conference.
+    if len(games_list) == 0 and conference_wins and standings_dict:
+        standings = update_standings(conference_wins, standings_dict, num_sims)
+        return standings, conference_wins
 
     for i in range(len(games_list)):
         total_points, num_wins = accumulate_points_and_wins(total_points,

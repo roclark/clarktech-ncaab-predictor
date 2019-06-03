@@ -61,9 +61,8 @@ class Predictor:
         return differential_vector(data)
 
     def _create_features(self, data):
-        X = data.drop('away_points', 1)
-        X = X.drop('home_points', 1)
-        y = data[['home_points', 'away_points']].values
+        X = data.drop('points_difference', 1)
+        y = data['points_difference']
         split_data = train_test_split(X, y)
         self._X_train, self._X_test, self._y_train, self._y_test = split_data
 

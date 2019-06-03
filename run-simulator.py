@@ -14,6 +14,7 @@ from csv import reader
 from datetime import datetime
 from mascots import MASCOTS
 from math import ceil, sqrt
+from operator import itemgetter
 from os import path, makedirs
 from predictor import Predictor
 from save_json import save_predictions_json, save_simulation
@@ -80,7 +81,7 @@ def display_predictions(predictions):
 
 
 def create_prediction_data(match_data, winner, loser, winner_prob, loser_prob,
-                           winner_points, loser_points):
+                           spread):
     tags = ['all']
     if match_data.top_25:
         tags += ['top-25']
@@ -108,9 +109,8 @@ def create_prediction_data(match_data, winner, loser, winner_prob, loser_prob,
         'predictedLoser': loser_name,
         'predictedLoserAbbreviation': loser,
         'predictedLoserMascot': MASCOTS[loser],
-        'winnerPoints': winner_points,
+        'predictedSpread': spread,
         'winnerProbability': winner_prob,
-        'loserPoints': loser_points,
         'loserProbability': loser_prob,
         'tags': tags
     }
@@ -150,10 +150,10 @@ def get_probability(num_wins, winner, loser, num_sims):
     return winner_prob, loser_prob
 
 
-def get_points(points, winner, loser, num_sims):
-    winner_points = float(points[winner]) / float(num_sims)
-    loser_points = float(points[loser]) / float(num_sims)
-    return winner_points, loser_points
+def get_points(points, winner, num_sims):
+    # As the spread is the difference between the home and away points, the
+    # winners and losers will have the same values with opposite sides.
+    return float(points[winner]) / float(num_sims)
 
 
 def determine_overall_results(matchups, total_points, num_wins, num_sims):
@@ -167,11 +167,9 @@ def determine_overall_results(matchups, total_points, num_wins, num_sims):
                                                                 winner,
                                                                 loser,
                                                                 num_sims)
-        winner_points, loser_points = get_points(total_points, winner, loser,
-                                                 num_sims)
+        spread = get_points(total_points, winner, num_sims)
         p = create_prediction_data(matchup, winner, loser, winner_probability,
-                                   loser_probability, winner_points,
-                                   loser_points)
+                                   loser_probability, spread)
         prediction_list.append(p)
     return prediction_list
 
@@ -261,7 +259,13 @@ def simulate_conference(predictor, details, rankings, teams, num_sims):
                                                        rankings)
     match_stats, games = aggregate_match_stats(stats_dict, stdev_dict,
                                                schedule, num_sims)
-    predictions = create_predictions(match_stats, predictor)
+    # Only predict future standings if there are conference games remaining
+    # on any schedule. Otherwise, the projected standings are equal to the
+    # current standings as the conference has ended.
+    if len(match_stats) != 0:
+        predictions = create_predictions(match_stats, predictor)
+    else:
+        predictions = []
     standings_dict, total_wins = determine_outcomes(predictions, games,
                                                     standings_dict,
                                                     conference_wins, num_sims)
@@ -289,7 +293,7 @@ def power_ranking_matchups(matchups, teams, rankings):
 def split_power_rankings_data(dataset):
     set_size = int(ceil(sqrt(len(dataset)))) * 2
 
-    for i in xrange(0, len(dataset), set_size):
+    for i in range(0, len(dataset), set_size):
         subset = dataset[i:i+set_size]
         yield map(list, list(itertools.permutations(subset, 2)))
 
@@ -312,13 +316,11 @@ def sort_by_simple_rating_system(stats_dict):
 
 def get_totals(matches, predictions, team_mov):
     for i in range(len(matches)):
-        home_score, away_score = predictions[i]
+        spread = predictions[i]
         home_team = matches[i].home_abbreviation
         away_team = matches[i].away_abbreviation
-        team_mov[home_team] = team_mov.get(home_team, 0) + home_score - \
-            away_score
-        team_mov[away_team] = team_mov.get(away_team, 0) + away_score - \
-            home_score
+        team_mov[home_team] = team_mov.get(home_team, 0) + spread
+        team_mov[away_team] = team_mov.get(away_team, 0) - spread
     return team_mov
 
 
@@ -331,7 +333,7 @@ def print_rankings(rankings):
 
 
 def update_rankings(rankings, team_mov, dataset):
-    sorted_ranks = [(v,k) for k,v in team_mov.iteritems()]
+    sorted_ranks = [(v,k) for k,v in team_mov.items()]
     sorted_ranks.sort(reverse=True)
     dataset = list(set([team for matchup in dataset for team in matchup]))
     for _, team in sorted_ranks:
@@ -354,7 +356,7 @@ def load_ncaa_tournament_csv(filename):
     tourney_dict = {}
     team_seeds = {}
 
-    with open(filename, 'rb') as csvfile:
+    with open(filename, 'r') as csvfile:
         tournament = reader(csvfile, delimiter=';')
         header = next(tournament)
         seeds = header[-1].split(',')
@@ -398,7 +400,7 @@ def load_simulation():
 
 def get_teams_dict(simulation, conference):
     for conf in simulation['simulation']['conferences']:
-        if conf['conferenceName'] == conference:
+        if conf['conferenceAbbreviation'] == conference:
             return conf['teams']
 
 
@@ -436,7 +438,7 @@ def simulate_conference_tournament(predictor, seeds, bracket, teams, rankings,
                                    stats_dict, stdev_dict, num_sims):
     winner = None
 
-    for game_name, game_data in sorted(bracket.iteritems()):
+    for game_name, game_data in sorted(bracket.items()):
         game_data = include_teams(game_data, bracket, seeds)
         matchup = [[game_data['top_team'], game_data['bottom_team']]]
         match = create_matches(matchup, teams, rankings)
@@ -484,7 +486,7 @@ def start_monte_carlo_simulations(predictor, rankings, teams,
         points_dict[abbreviation] = {'points': points,
                                      'name': details['name']}
     simulation = save_simulation(num_sims, results_dict, points_dict,
-                                 'simulations/simulation.json')
+                                 'simulations/simulation.json', teams)
     if not skip_save_to_mongodb:
         save_to_mongodb(simulation, MONTE_CARLO_SIMULATION)
 
@@ -522,6 +524,7 @@ def start_power_rankings(predictor, teams, rankings, num_sims,
     stats_dict, stdev_dict = find_stdev_for_every_stat(teams, rankings)
     simple_rating_system = sort_by_simple_rating_system(stats_dict)
     for subset in split_power_rankings_data(simple_rating_system):
+        subset = list(subset)
         matches = power_ranking_matchups(subset, teams, rankings)
         match_stats, games = aggregate_match_stats(stats_dict, stdev_dict,
                                                    matches, num_sims)
