@@ -13,7 +13,7 @@ from sklearn.feature_selection import SelectFromModel
 
 
 class Predictor:
-    def __init__(self, data_directory='matches'):
+    def __init__(self):
         self._regressor = None
         self._model = None
         self._X_train = None
@@ -21,7 +21,7 @@ class Predictor:
         self._y_train = None
         self._y_test = None
 
-        data = self._read_data(data_directory)
+        data = self._read_data()
         self._create_features(data)
         self._create_regressor()
         self._train_model()
@@ -43,12 +43,12 @@ class Predictor:
     def predict(self, test_data, output_datatype):
         return self._model.predict(test_data).astype(output_datatype)
 
-    def _read_data(self, data_directory):
+    def _read_data(self):
         if path.exists(DATASET_NAME):
             data = pd.read_pickle(DATASET_NAME)
             return differential_vector(data)
         frames = [pd.read_pickle(match) for match in \
-                  glob('%s/*/*' % data_directory)]
+                  glob('matches/*/*')]
         data = pd.concat(frames)
         data.drop_duplicates(inplace=True)
         data = filter_stats(data)

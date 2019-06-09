@@ -596,70 +596,6 @@ def initiate_algorithm(args, predictor, teams, rankings):
                                         args.num_sims, args.filename)
 
 
-def check_dir(directory):
-    if not path.exists(directory):
-        makedirs(directory)
-
-
-def check_path(filepath, name, match_data_location):
-    if path.exists(filepath):
-        return True
-    else:
-        if not path.exists('%s/%s' % (match_data_location, name)):
-            makedirs('%s/%s' % (match_data_location, name))
-        return False
-
-
-def determine_location(game, team, sos, srs, opp_sos, opp_srs):
-    if game.location == 'Away' or (game.location == 'Neutral' and \
-       team.abbreviation not in game.boxscore_index):
-        return opp_sos, opp_srs, sos, srs
-    else:
-        return sos, srs, opp_sos, opp_srs
-
-
-def get_sos_and_srs(game, teams, team):
-    sos = team.strength_of_schedule
-    srs = team.simple_rating_system
-    opponent = teams(game.opponent_abbr)
-    opponent_sos = opponent.strength_of_schedule
-    opponent_srs = opponent.simple_rating_system
-    return determine_location(game, team, sos, srs, opponent_sos, opponent_srs)
-
-
-def add_sos_and_srs(game, teams, team):
-    df = game.dataframe_extended
-    home_sos, home_srs, away_sos, away_srs = get_sos_and_srs(game, teams, team)
-    try:
-        df['home_strength_of_schedule'] = home_sos
-        df['home_simple_rating_system'] = home_srs
-        df['away_strength_of_schedule'] = away_sos
-        df['away_simple_rating_system'] = away_srs
-    except TypeError:
-        return None
-    return df
-
-
-def pull_match_stats(dataset, teams, rankings):
-    for team in teams:
-        for game in team.schedule:
-            path = '%s/%s/%s.plk' % (dataset, team.abbreviation.lower(),
-                                     game.boxscore_index)
-            if check_path(path, team.abbreviation.lower(), dataset) or \
-               not game.boxscore_index:
-                continue
-            # Occurs when the opponent is Non-DI and the game should be skipped
-            # since only DI matchups should be analyzed.
-            if game.opponent_abbr == game.opponent_name:
-                continue
-            opponent = teams(game.opponent_abbr)
-            df = add_sos_and_srs(game, teams, team)
-            try:
-                df.to_pickle(path)
-            except AttributeError:
-                continue
-
-
 def arguments():
     parser = ArgumentParser()
     subparser = parser.add_subparsers(dest='algorithm', metavar='algorithm')
@@ -689,12 +625,6 @@ def arguments():
     parser.add_argument('--num-sims', '-n', help='Optionally specify the '
     'number of simulations to run. Default value is %s simulations.' %
     NUM_SIMS, default=NUM_SIMS, type=int)
-    parser.add_argument('--dataset', help='Specify which dataset to use. For '
-    'testing purposes, use the "sample-data" directory. For production '
-    'deployments, use "matches" with current data that was pulled.',
-    default='matches')
-    parser.add_argument('--skip-pulling-matches', help='Optionally choose to '
-    'skip saving individual match data.', action='store_true')
     parser.add_argument('--skip-save-to-mongodb', help='Optionally skip saving'
     ' results to a MongoDB database.', action='store_true')
     return parser.parse_args()
@@ -704,9 +634,7 @@ def main():
     args = arguments()
     teams = Teams()
     rankings = Rankings().current
-    if not args.skip_pulling_matches:
-        pull_match_stats(args.dataset, teams, rankings)
-    predictor = Predictor(args.dataset)
+    predictor = Predictor()
     initiate_algorithm(args, predictor, teams, rankings)
 
 
