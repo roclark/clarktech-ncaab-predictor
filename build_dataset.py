@@ -2,11 +2,9 @@ import pandas as pd
 from common import filter_stats
 from glob import iglob
 from os.path import exists
+from predictor import DATASET_NAME
 from sportsreference.ncaab.rankings import Rankings
 from sportsreference.ncaab.teams import Teams
-
-
-DATASET_NAME = 'dataset.pkl'
 
 
 def determine_location(game, team, sos, srs, opp_sos, opp_srs):

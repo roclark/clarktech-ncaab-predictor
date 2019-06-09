@@ -1,6 +1,5 @@
 import pandas as pd
 import numpy as np
-from build_dataset import DATASET_NAME
 from common import differential_vector, filter_stats
 from glob import glob
 from os import path
@@ -10,6 +9,9 @@ from sklearn.metrics import accuracy_score
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.feature_selection import SelectFromModel
+
+
+DATASET_NAME = 'dataset.pkl'
 
 
 class Predictor:
