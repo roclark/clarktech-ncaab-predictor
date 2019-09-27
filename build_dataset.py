@@ -1,5 +1,6 @@
 import pandas as pd
 from common import filter_stats
+from datetime import date, timedelta
 from glob import iglob
 from os.path import exists
 from predictor import DATASET_NAME
@@ -47,27 +48,34 @@ def check_path(filepath, name):
 
 
 def pull_match_stats(teams, rankings):
+    yesterday = date.today() - timedelta(days=1)
+
     for team in teams:
-        for game in team.schedule:
-            path = 'matches/%s/%s.pkl' % (team.abbreviation.lower(),
-                                          game.boxscore_index)
-            if check_path(path, team.abbreviation.lower()) or \
-               not game.boxscore_index:
-                continue
-            # Occurs when the opponent is Non-DI and the game should be skipped
-            # since only DI matchups should be analyzed.
-            if game.opponent_abbr == game.opponent_name:
-                continue
-            opponent = teams(game.opponent_abbr)
-            df = add_sos_and_srs(game, teams, team)
-            try:
-                df.to_pickle(path)
-            except AttributeError:
-                continue
+        # Only pull the team's most recent game instead of iterating through
+        # the entire schedule as this is intended to be checked daily.
+        game = team.schedule[-1]
+        # Ensure the latest game was played yesterday to avoid duplicates.
+        if game.datetime.date() != yesterday:
+            continue
+        path = 'matches/%s/%s.pkl' % (team.abbreviation.lower(),
+                                      game.boxscore_index)
+        if check_path(path, team.abbreviation.lower()) or \
+           not game.boxscore_index:
+            continue
+        # Occurs when the opponent is Non-DI and the game should be skipped
+        # since only DI matchups should be analyzed.
+        if game.opponent_abbr == game.opponent_name:
+            continue
+        opponent = teams(game.opponent_abbr)
+        df = add_sos_and_srs(game, teams, team)
+        try:
+            df.to_pickle(path)
+        except AttributeError:
+            continue
 
 
 def build_dataset():
-    data = pd.DataFrame()
+    data = pd.read_pickle(DATASET_NAME)
     frames = []
     for i, match in enumerate(iglob('matches/*/*')):
         if not i % 1000:
