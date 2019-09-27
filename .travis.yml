@@ -9,4 +9,5 @@ install:
     - pip install -r requirements.txt
 
 script:
-    - python run-simulator.py --skip-save-to-mongodb daily-simulation
+    - docker pull roclark/clarktech-ncaab-predictor
+    - docker run --rm roclark/clarktech-ncaab-predictor --skip-save-to-mongodb daily-simulation
