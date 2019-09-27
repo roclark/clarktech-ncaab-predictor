@@ -1,4 +1,5 @@
 import pandas as pd
+import pickle
 import numpy as np
 from common import differential_vector, filter_stats
 from glob import glob
@@ -12,6 +13,7 @@ from sklearn.feature_selection import SelectFromModel
 
 
 DATASET_NAME = 'dataset.pkl'
+MODEL_NAME = 'trained_model.pkl'
 
 
 class Predictor:
@@ -23,10 +25,12 @@ class Predictor:
         self._y_train = None
         self._y_test = None
 
-        data = self._read_data()
-        self._create_features(data)
-        self._create_regressor()
-        self._train_model()
+        self._model = self._load_model()
+        if not self._model:
+            data = self._read_data()
+            self._create_features(data)
+            self._create_regressor()
+            self._train_model()
 
     def simplify(self, test_data):
         test_data = test_data.loc[:, test_data.columns.isin(self._filtered_features)]
@@ -40,6 +44,7 @@ class Predictor:
                       'max_depth': 6}
         self._model = RandomForestRegressor(**parameters)
         self._model.fit(self._X_train, self._y_train)
+        self._save_model()
         return test_data
 
     def predict(self, test_data, output_datatype):
@@ -78,3 +83,14 @@ class Predictor:
         self._X_train = self._model.transform(self._X_train)
         new_columns = train.columns[self._model.get_support()]
         self._filtered_features = [str(col) for col in new_columns]
+
+    def _save_model(self):
+        with open(MODEL_NAME, 'wb') as f:
+            pickle.dump(self._model, f)
+
+    def _load_model(self):
+        try:
+            with open(MODEL_NAME, 'rb') as f:
+                return pickle.load(f)
+        except FileNotFoundError:
+            return
