@@ -4,7 +4,6 @@ import pandas as pd
 import random
 import re
 import requests
-from pymongo import MongoClient
 
 
 FIELDS_TO_COMBINE = {

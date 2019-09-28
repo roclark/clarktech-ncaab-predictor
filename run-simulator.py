@@ -48,8 +48,8 @@ class MatchInfo:
         self.top_25 = top_25
 
 
-def save_to_mongodb(simulation, algorithm):
-    client = MongoClient()
+def save_to_mongodb(mongo_url, simulation, algorithm):
+    client = MongoClient(mongo_url)
     db = client.clarktechsports
     # Clear all of the existing simulations and add simulation for the current
     # day
@@ -61,7 +61,7 @@ def save_to_mongodb(simulation, algorithm):
         db.conference_predictions.insert_many(post)
 
 
-def save_predictions(predictions, skip_save_to_mongodb):
+def save_predictions(mongo_url, predictions, skip_save_to_mongodb):
     today = datetime.now()
     if not path.exists('predictions'):
         makedirs('predictions')
@@ -70,7 +70,7 @@ def save_predictions(predictions, skip_save_to_mongodb):
                                               today.year)
     save_predictions_json(predictions, filename)
     if not skip_save_to_mongodb:
-        save_to_mongodb(predictions, DAILY_SIMULATION)
+        save_to_mongodb(mongo_url, predictions, DAILY_SIMULATION)
 
 
 def display_predictions(predictions):
@@ -342,11 +342,11 @@ def update_rankings(rankings, team_mov, dataset):
     return rankings
 
 
-def save_rankings(rankings, skip_mongo):
+def save_rankings(mongo_url, rankings, skip_mongo):
     if skip_mongo:
         return
     overall_rankings = []
-    client = MongoClient()
+    client = MongoClient(mongo_url)
     db = client.clarktechsports
     db.power_rankings.update_many({}, {'$set': {'latest': False}})
     db.power_rankings.insert({'latest': True, 'rankings': rankings})
@@ -455,8 +455,8 @@ def simulate_conference_tournament(predictor, seeds, bracket, teams, rankings,
     return winner
 
 
-def start_daily_simulations(predictor, teams, skip_save_to_mongodb, rankings,
-                            num_sims):
+def start_daily_simulations(predictor, teams, mongo_url, skip_save_to_mongodb,
+                            rankings, num_sims):
     matchups = find_todays_games(teams)
     if len(matchups) == 0:
         print("Couldn't find games scheduled for today. Exiting...")
@@ -469,10 +469,10 @@ def start_daily_simulations(predictor, teams, skip_save_to_mongodb, rankings,
     prediction_list = determine_overall_results(matchups, total_points,
                                                 num_wins, num_sims)
     display_predictions(prediction_list)
-    save_predictions(prediction_list, skip_save_to_mongodb)
+    save_predictions(mongo_url, prediction_list, skip_save_to_mongodb)
 
 
-def start_monte_carlo_simulations(predictor, rankings, teams,
+def start_monte_carlo_simulations(predictor, rankings, teams, mongo_url,
                                   num_sims=NUM_SIMS,
                                   skip_save_to_mongodb=False):
     results_dict = {}
@@ -488,7 +488,7 @@ def start_monte_carlo_simulations(predictor, rankings, teams,
     simulation = save_simulation(num_sims, results_dict, points_dict,
                                  'simulations/simulation.json', teams)
     if not skip_save_to_mongodb:
-        save_to_mongodb(simulation, MONTE_CARLO_SIMULATION)
+        save_to_mongodb(mongo_url, simulation, MONTE_CARLO_SIMULATION)
 
 
 def start_matchup_simulation(predictor, teams, rankings, num_sims, home, away):
@@ -515,7 +515,7 @@ def start_matchup_simulation(predictor, teams, rankings, num_sims, home, away):
     display_predictions(prediction_list)
 
 
-def start_power_rankings(predictor, teams, rankings, num_sims,
+def start_power_rankings(predictor, teams, rankings, num_sims, mongo_url,
                          skip_save_to_mongodb):
     matches = []
     team_mov = {}
@@ -532,7 +532,7 @@ def start_power_rankings(predictor, teams, rankings, num_sims,
         team_mov = get_totals(matches, predictions, team_mov)
         power_rankings = update_rankings(power_rankings, team_mov, subset)
     print_rankings(power_rankings)
-    save_rankings(power_rankings, skip_save_to_mongodb)
+    save_rankings(mongo_url, power_rankings, skip_save_to_mongodb)
 
 
 def start_conference_tournament_simulator(predictor, teams, rankings,
@@ -574,17 +574,19 @@ def start_ncaa_tournament_simulator(predictor, teams, rankings, num_sims,
 
 def initiate_algorithm(args, predictor, teams, rankings):
     if args.algorithm == DAILY_SIMULATION:
-        start_daily_simulations(predictor, teams, args.skip_save_to_mongodb,
-                                rankings, args.num_sims)
+        start_daily_simulations(predictor, teams, args.mongodb_url,
+                                args.skip_save_to_mongodb, rankings,
+                                args.num_sims)
     elif args.algorithm == MONTE_CARLO_SIMULATION:
         start_monte_carlo_simulations(predictor, rankings, teams,
-                                      args.num_sims, args.skip_save_to_mongodb)
+                                      args.mongodb_url, args.num_sims,
+                                      args.skip_save_to_mongodb)
     elif args.algorithm == MATCHUP:
         start_matchup_simulation(predictor, teams, rankings, args.num_sims,
                                  args.home, args.away)
     elif args.algorithm == POWER_RANKINGS:
         start_power_rankings(predictor, teams, rankings, args.num_sims,
-                             args.skip_save_to_mongodb)
+                             args.mongodb_url, args.skip_save_to_mongodb)
     elif args.algorithm == CONFERENCE_TOURNAMENT:
         if not path.isfile('simulations/simulation.json'):
             print('Conference simulation does not yet exist')
@@ -630,6 +632,9 @@ def arguments():
     NUM_SIMS, default=NUM_SIMS, type=int)
     parser.add_argument('--skip-save-to-mongodb', help='Optionally skip saving'
     ' results to a MongoDB database.', action='store_true')
+    parser.add_argument('--mongodb-url', help='Specify the URL of the MongoDB '
+    'database to save results to. Default: localhost', type=str,
+    default='localhost')
     return parser.parse_args()
 
 
