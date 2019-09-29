@@ -2,8 +2,8 @@ name: Daily build and upload of Container
 
 on:
   schedule:
-  # Run every morning at 2AM
-  - cron: 0 2 * * *
+  # Run every morning at 9AM UTC
+  - cron: 0 9 * * *
 
 jobs:
   build:
