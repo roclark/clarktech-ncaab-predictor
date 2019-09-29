@@ -1,4 +1,4 @@
-name: Python application
+name: Daily build and upload of Container
 
 on:
   schedule:
