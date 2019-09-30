@@ -44,6 +44,6 @@ jobs:
       run: |
         docker build -t roclark/clarktech-ncaab-predictor:$(date +%y.%m.%d) -t roclark/clarktech-ncaab-predictor .
         # Run a quick test to ensure the new image still functions as expected.
-        docker run --rm -it roclark/clarktech-ncaab-predictor --skip-save-to-mongodb daily-simulation
+        docker run --rm roclark/clarktech-ncaab-predictor --skip-save-to-mongodb daily-simulation
         echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
         docker push roclark/clarktech-ncaab-predictor
