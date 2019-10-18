@@ -351,5 +351,6 @@ MASCOTS = {
     'tennessee-martin': 'Skyhawks',
     'cal-state-bakersfield': 'Roadrunners',
     'california-baptist': 'Lancers',
-    'north-alabama': 'Lions'
+    'north-alabama': 'Lions',
+    'merrimack': 'Warriors'
 }
