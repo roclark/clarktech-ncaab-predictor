@@ -356,13 +356,22 @@ def print_rankings(rankings):
         i += 1
 
 
-def update_rankings(rankings, team_mov, dataset):
+def update_rankings(rankings, team_mov, dataset, teams):
     sorted_ranks = [(v,k) for k,v in team_mov.items()]
     sorted_ranks.sort(reverse=True)
     dataset = list(set([team for matchup in dataset for team in matchup]))
     for _, team in sorted_ranks:
         if team not in rankings and team in dataset:
-            rankings.append(team)
+            team_data = teams(team)
+            rank_data = {
+                'name': team_data.name,
+                'abbreviation': team_data.abbreviation,
+                'mascot': MASCOTS[team],
+                'wins': team_data.wins,
+                'losses': team_data.losses,
+                'conference': team_data.conference
+            }
+            rankings.append(rank_data)
     return rankings
 
 
@@ -640,7 +649,8 @@ def start_power_rankings(predictor, teams, rankings, num_sims, mongo_url,
                                                    matches, num_sims)
         predictions = create_predictions(match_stats, predictor)
         team_mov = get_totals(matches, predictions, team_mov)
-        power_rankings = update_rankings(power_rankings, team_mov, subset)
+        power_rankings = update_rankings(power_rankings, team_mov, subset,
+                                         teams)
     print_rankings(power_rankings)
     save_rankings(mongo_url, power_rankings, skip_save_to_mongodb)
 
