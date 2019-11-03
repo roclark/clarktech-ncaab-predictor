@@ -62,6 +62,7 @@ def save_to_mongodb(mongo_url, simulation, algorithm):
     # day
     db.conference_predictions.update_many({}, {'$set': {'latest': False}})
     if algorithm == DAILY_SIMULATION:
+        db.predictions.update_many({}, {'$set': {'latest': False}})
         db.predictions.insert_many(simulation)
     elif algorithm == MONTE_CARLO_SIMULATION:
         post = simulation['simulation']['conference']
