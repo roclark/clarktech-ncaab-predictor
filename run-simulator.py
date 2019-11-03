@@ -2,6 +2,7 @@ import itertools
 import json
 import pandas as pd
 from argparse import ArgumentParser
+from calendar import day_name
 from common import (accumulate_points_and_wins,
                     aggregate_match_stats,
                     create_predictions,
@@ -96,6 +97,20 @@ def create_prediction_data(match_data, winner, loser, winner_prob, loser_prob,
     tags.append(match_data.home.conference)
     tags.append(match_data.away.conference)
     tags = list(set(tags))
+    date = datetime.today()
+    dow = day_name[date.weekday()]
+    month = date.strftime('%B')
+    day = date.strftime('%d').lstrip('0')
+    if day[-1] == '1':
+        day = day + 'st'
+    elif day[-1] == '2':
+        day = day + 'nd'
+    elif day[-1] == '3':
+        day = day + 'rd'
+    else:
+        day = day + 'th'
+    year = date.strftime('%Y')
+    date = '%s, %s %s, %s' % (dow, month, day, year)
     if winner == match_data.home_abbreviation:
         winner_name = match_data.home_name
         loser_name = match_data.away_name
@@ -120,6 +135,7 @@ def create_prediction_data(match_data, winner, loser, winner_prob, loser_prob,
         'predictedSpread': spread,
         'winnerProbability': winner_prob,
         'loserProbability': loser_prob,
+        'date': date,
         'tags': tags
     }
     return prediction
