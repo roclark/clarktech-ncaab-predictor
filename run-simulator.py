@@ -269,7 +269,6 @@ def get_remaining_schedule(conference_teams, teams, rankings):
                         'top_25': top_25
                     }
                 remaining_schedule.append(populate_game_info(teams, game))
-    remaining_schedule.sort()
     # Return a list of non-duplicate matches
     schedule = list(s for s, _ in itertools.groupby(remaining_schedule))
     return schedule, current_records

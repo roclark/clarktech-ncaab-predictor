@@ -251,7 +251,7 @@ def determine_conference_standings(num_wins, conference_wins):
 
 
 def print_probabilities_ordered(probabilities):
-    sorted_ranks = [(v,k) for k,v in probabilities.iteritems()]
+    sorted_ranks = [(v,k) for k,v in probabilities.items()]
     sorted_ranks.sort(reverse=True)
     for probability, team in sorted_ranks:
         print('%s: %s%%' % (team, probability * 100.0))
