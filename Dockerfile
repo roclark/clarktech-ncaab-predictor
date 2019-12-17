@@ -15,6 +15,9 @@ RUN pip install -r requirements.txt
 # Copy all files not listed in .dockerignore to the working directory.
 COPY . /app
 
+# Create an empty directory to save simulations to.
+RUN mkdir -p simulations/
+
 # Since the scripts are run in python, the 'python' entrypoint should be used to
 # easily call the run script and parameters can be added at the end of the Docker
 # command.
