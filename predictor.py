@@ -1,3 +1,4 @@
+import cudf
 import pandas as pd
 import numpy as np
 from common import differential_vector, filter_stats
@@ -7,7 +8,8 @@ from sklearn import tree
 from sklearn.externals.six import StringIO
 from sklearn.metrics import accuracy_score
 from sklearn.model_selection import train_test_split
-from sklearn.ensemble import RandomForestRegressor
+#from sklearn.ensemble import RandomForestRegressor
+from cuml.ensemble import RandomForestRegressor
 from sklearn.feature_selection import SelectFromModel
 
 
@@ -61,8 +63,9 @@ class Predictor:
         return differential_vector(data)
 
     def _create_features(self, data):
-        X = data.drop('points_difference', 1)
-        y = data['points_difference']
+        cudf_data = cudf.DataFrame.from_pandas(data)
+        X = cudf_data.drop('points_difference', 1)
+        y = cudf_data['points_difference']
         split_data = train_test_split(X, y)
         self._X_train, self._X_test, self._y_train, self._y_test = split_data
 
