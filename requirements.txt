@@ -4,7 +4,7 @@ cssselect==1.1.0
 idna==2.8
 joblib==0.13.2
 lxml==4.6.3
-numpy==1.17.2
+numpy==1.22.0
 pandas==0.25.1
 pymongo==3.9.0
 pyquery==1.4.0
